@@ -14,8 +14,6 @@ import { logMissingFieldErrors } from "@apollo/client/core/ObservableQuery";
 
 
 
-
-
 const Main = () => {
   const storyBarRef = useRef(null);
   const token = sessionStorage.getItem('user');
@@ -27,6 +25,15 @@ const Main = () => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deletePostId, setDeletePostId] = useState(null);
   const postRefs = useRef({});
+
+  const { data, loading, error, refetch } = useQuery(GET_ALL_POSTS, {
+    variables: {userId : tokens?.id},
+    errorPolicy: 'all', // Show partial data even if there are errors
+    fetchPolicy: 'cache-and-network', // Always fetch from network
+    onError: (error) => {
+      console.error('GraphQL Error:', error);
+    }
+  });  
 
   const scrollStories = (direction) => {
     try {
@@ -107,9 +114,19 @@ const Main = () => {
        
   }
 
-  const handleDeletePost = (id) => {
-    setDeletePostId(id);
-    setShowDeleteConfirm(true);
+  const handleDeletePost = async(id) => {
+       if(!id) return;
+       try{
+            setShowDeleteConfirm(true);
+
+        const query = `mutation DeletePost($id: ID!) { DeletePost(id: $id) }`;
+        const response =  await axios.post("http://localhost:5000/graphql", { query: query, variables: { id } }, {
+          headers: {
+            'Content-Type': 'application/json'
+          } });
+
+
+       } catch(err){ console.error(err); }
   };
 
   const confirmDeletePost = async () => {
@@ -141,16 +158,12 @@ const Main = () => {
     setDeletePostId(null);
   };
 
-  // Fetch posts from backend
-  const { data, loading, error, refetch } = useQuery(GET_ALL_POSTS, {
-    variables: {userId : tokens?.id},
-    errorPolicy: 'all', // Show partial data even if there are errors
-    fetchPolicy: 'cache-and-network', // Always fetch from network
-    onError: (error) => {
-      console.error('GraphQL Error:', error);
-    }
-  });  
-     /* console.log(...) */ void 0;
+  const handleArchivePost = (postId) => {
+    // Remove archived post from main feed
+    setAllPosts((prev) => prev.filter((post) => post.id !== postId));
+  };
+
+  
      
   useEffect(() => {
     if (data?.getAllPosts) {    
@@ -294,6 +307,7 @@ const Main = () => {
                     postId={post.id}
                     postData={post}
                     existingComments={post.comments || []}
+                    onArchive={handleArchivePost}
                   />
                 </ErrorBoundary>
               </div>

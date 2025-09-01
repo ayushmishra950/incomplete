@@ -218,7 +218,7 @@ const typeDefs = gql`
     updateUserPrivacy(userId: ID!, isPrivate: Boolean!): String
 
     createPost(id: ID, caption: String!, image: Upload, video: Upload, thumbnail: Upload): Post
-    DeletePost(id: ID!) : String!
+    DeletePost(id: ID!) : String
     LikePost(userId: ID!,postId: ID!) : String!
     CommentPost(userId: ID!,postId: ID!, text:String!):[Comment]!
 

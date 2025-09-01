@@ -931,6 +931,7 @@ archivePost: async (_, { postId,userId }, { user }) => {
 
     
     DeletePost: async (_, { id}) => {      
+if (!id) throw new Error("Post ID is required");
       const deletePost = await Post.findByIdAndDelete(id);
 
 if (deletePost) {

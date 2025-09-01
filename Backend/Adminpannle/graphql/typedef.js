@@ -119,7 +119,7 @@ const adminTypeDefs = gql`
     loginAdmin(input: LoginAdminInput!): AuthPayload!
     blockUser(userId: ID!): User
     unblockUser(userId: ID!): User
-     DeletePost(id: ID!,type: String!) : String!
+     DeletePostByAdmin(id: ID!) : String!
      createCategory(name: String!, userId: ID!): Category!
     deleteCategory(id: ID!, userId: ID!): Boolean!
   }

@@ -4,7 +4,8 @@ const mediaSchema = new mongoose.Schema({
   url: { type: String },
   type: { type: String }, // e.g., "image", "video", "file"
   filename: { type: String },
-  size: { type: Number }
+  size: { type: Number },
+  duration: { type: Number } // for videos/audio
 }, { _id: false }); // prevents extra _id in subdoc
 
 const clearedChatSchema = new mongoose.Schema({

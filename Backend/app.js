@@ -117,11 +117,12 @@ app.post('/upload-chat-media', upload.single('file'), async (req, res) => {
       return res.status(400).json({ error: 'No file uploaded' });
     }
 
-    // console.log('📁 File received:', {
-    //   originalname: req.file.originalname,
-    //   mimetype: req.file.mimetype,
-    //   size: req.file.size
-    // });
+    console.log('📁 File received:', {
+      originalname: req.file.originalname,
+      mimetype: req.file.mimetype,
+      size: req.file.size,
+      duration: req.body.duration // Duration from frontend
+    });
 
     const fileType = req.file.mimetype.startsWith('image/') ? 'image' :
       req.file.mimetype.startsWith('video/') ? 'video' :
@@ -180,10 +181,12 @@ app.post('/upload-chat-media', upload.single('file'), async (req, res) => {
               console.error('❌ Cloudinary audio upload error:', error);
               reject(error);
             } else {
-              // console.log('✅ Audio upload success:', result.secure_url);
+              console.log('✅ Audio upload success:', result.secure_url);
+              // Use frontend duration if available, otherwise use Cloudinary duration
+              const audioDuration = req.body.duration ? parseFloat(req.body.duration) : (result.duration || 0);
               resolve({
                 url: result.secure_url,
-                duration: result.duration || 0,
+                duration: audioDuration,
                 bytes: result.bytes || req.file.size
               });
             }
@@ -876,6 +879,19 @@ async function startServer() {
       }
 
       res.json({ userId, results });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Debug route to print GraphQL schema
+  app.get('/debug/schema', (req, res) => {
+    try {
+      const { printSchema } = require('graphql');
+      const schema = server.schema;
+      const schemaString = printSchema(schema);
+      res.set('Content-Type', 'text/plain');
+      res.send(schemaString);
     } catch (error) {
       res.status(500).json({ error: error.message });
     }

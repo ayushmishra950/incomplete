@@ -781,6 +781,22 @@ const ChatList = ({ activeTab, createdGroups }) => {
     if (messagesData?.getMessages) {
       setMessages(messagesData.getMessages);
       
+      // Pre-populate audio durations from database
+      const audioDurations = {};
+      messagesData.getMessages.forEach(msg => {
+        if (msg.media?.type === 'audio' && msg.media?.duration) {
+          audioDurations[msg.id] = msg.media.duration;
+        }
+      });
+      
+      if (Object.keys(audioDurations).length > 0) {
+        setAudioDuration(prev => ({
+          ...prev,
+          ...audioDurations
+        }));
+        console.log('Pre-populated audio durations:', audioDurations);
+      }
+      
       // Clear unread count and mark messages as read for the selected chat when messages are loaded
       if (selectedChat && !selectedChat.isGroup) {
         setUserUnreadCounts(prev => {
@@ -2112,6 +2128,7 @@ const ChatList = ({ activeTab, createdGroups }) => {
       
       const formData = new FormData();
       formData.append('file', recordedAudio.file);
+      formData.append('duration', recordedAudio.duration.toString()); // Pass duration as string
       
       const response = await fetch('http://localhost:5000/upload-chat-media', {
         method: 'POST',
@@ -2270,9 +2287,12 @@ const ChatList = ({ activeTab, createdGroups }) => {
       audioRefs.current[messageId] = newAudio;
       
       newAudio.addEventListener('loadedmetadata', () => {
+        // Use database duration if available, otherwise use audio file duration
+        const msg = messages.find(m => m.id === messageId);
+        const dbDuration = msg?.media?.duration;
         setAudioDuration(prev => ({
           ...prev,
-          [messageId]: newAudio.duration
+          [messageId]: dbDuration || newAudio.duration
         }));
       });
       
@@ -2309,8 +2329,10 @@ const ChatList = ({ activeTab, createdGroups }) => {
 
   const formatAudioTime = (seconds) => {
     if (!seconds || isNaN(seconds)) return '0:00';
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
+    // Handle both integer and float seconds
+    const totalSeconds = Math.floor(parseFloat(seconds));
+    const mins = Math.floor(totalSeconds / 60);
+    const secs = totalSeconds % 60;
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 

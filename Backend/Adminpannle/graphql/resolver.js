@@ -448,27 +448,29 @@ const adminResolvers = {
       return user;
     }),
 
-    DeletePost: checkRole(['ADMIN'])(async (_, { id, type }) => {
-      if (!id || !type) throw new Error("Id or Type field not found");
+    DeletePostByAdmin: checkRole(['ADMIN'])(async (_, { id }) => {
+      if (!id) throw new Error("Id field not found");
 
-      if (type === 'posts') {
-        const deletePost = await Post.findByIdAndDelete(id);
-        if (deletePost) {
-          const user = await User.findById(deletePost.createdBy);
-          if (user) {
-            user.posts = user.posts.filter(
-              postId => postId.toString() !== deletePost._id.toString()
-            );
-            await user.save();
-          }
+      // Try to delete from Post collection first
+      const deletePost = await Post.findByIdAndDelete(id);
+      if (deletePost) {
+        const user = await User.findById(deletePost.createdBy);
+        if (user) {
+          user.posts = user.posts.filter(
+            postId => postId.toString() !== deletePost._id.toString()
+          );
+          await user.save();
         }
         return "DeletePost Successfully...";
-      } else if (type === 'reels') {
-        await Video.findByIdAndDelete(id);
+      }
+
+      // If not found in Post, try Video collection
+      const deleteVideo = await Video.findByIdAndDelete(id);
+      if (deleteVideo) {
         return "DeleteVideo Successfully...";
       }
 
-      throw new Error("Invalid type");
+      throw new Error("Post/Video not found");
     }),
 
     createCategory: checkRole(['ADMIN'])(async (_, { name, userId }) => {

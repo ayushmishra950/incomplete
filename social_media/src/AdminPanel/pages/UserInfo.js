@@ -100,7 +100,7 @@ const ContentGrid = ({ items, type }) => {
   const [openMenuId, setOpenMenuId] = useState(null)
   const [menuPos, setMenuPos] = useState({ top: 0, left: 0 })
 
-   const [deletePost] = useMutation(DELETE_POST_BY_ADMIN);
+   const [DeletePostByAdmin] = useMutation(DELETE_POST_BY_ADMIN);
 
   // Close dropdown on outside click or Escape
   useEffect(() => {
@@ -136,11 +136,11 @@ const ContentGrid = ({ items, type }) => {
 
   const handleDelete = async (itemId) => {
   try {
-   const result = await deletePost({
+   const result = await DeletePostByAdmin({
       variables: { id: itemId, type : type}
     });
 
-    alert(result?.data?.DeletePost);
+    alert(result?.data?.DeletePostByAdmin);
     setOpenMenuId(null);
   } catch (err) {
     console.error("Error deleting post:", err);

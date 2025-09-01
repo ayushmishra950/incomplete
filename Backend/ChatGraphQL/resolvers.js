@@ -372,7 +372,8 @@ module.exports = {
         
         // Determine file type
         const fileType = mimetype.startsWith('image/') ? 'image' : 
-                        mimetype.startsWith('video/') ? 'video' : 'auto';
+                        mimetype.startsWith('video/') ? 'video' : 
+                        mimetype.startsWith('audio/') ? 'video' : 'auto';
         
         console.log('🔍 Detected file type:', fileType);
         
@@ -387,17 +388,20 @@ module.exports = {
           // For images, uploadToCloudinary returns just the URL
           mediaData = {
             url: uploadResult,
-            type: fileType,
+            type: mimetype.startsWith('image/') ? 'image' : 'file',
             filename: filename,
             size: 0 // Size not available from string response
           };
         } else {
-          // For videos, uploadToCloudinary returns an object with metadata
+          // For videos and audio files, uploadToCloudinary returns an object with metadata
+          const actualType = mimetype.startsWith('audio/') ? 'audio' :
+                             mimetype.startsWith('video/') ? 'video' : 'file';
           mediaData = {
             url: uploadResult.url,
-            type: fileType,
+            type: actualType,
             filename: filename,
-            size: uploadResult.bytes || 0
+            size: uploadResult.bytes || 0,
+            duration: uploadResult.duration || 0
           };
         }
         

@@ -34,7 +34,8 @@ const SocialPost = ({
   onComment,
   postId,
   postData,
-  existingComments = []
+  existingComments = [],
+  onArchive
 }) => {
   
   const [likes, setLikes] = useState(initialLikes);
@@ -331,6 +332,11 @@ const SocialPost = ({
           refetchArchivedPosts();
         }
         
+        // Call onArchive callback to remove post from main feed
+        if (onArchive) {
+          onArchive(postId);
+        }
+        
         // Show notification
         addNewNotification({
           id: Date.now() + Math.random(),
@@ -621,13 +627,13 @@ const SocialPost = ({
   <img
     src={postImageSrc}
     alt="post"
-    className="w-full max-h-96 object-cover rounded-lg"
+    className="w-full max-h-96 object-contain rounded-lg"
   />
 ) : postVideoSrc ? (
   <video
     src={postVideoSrc}
     controls
-    className="w-full max-h-96 object-cover rounded-lg"
+    className="w-full max-h-96 object-contain rounded-lg"
     preload="metadata"
     style={{ maxHeight: '400px' }}
   >

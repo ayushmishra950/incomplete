@@ -380,8 +380,8 @@ export const CREATE_POST = gql`
 `;
 
 export const DELETE_POST_BY_ADMIN = gql`
-  mutation DeletePost($id: ID!, $type: String!) { 
-  DeletePost(id: $id,type:$type)
+  mutation DeletePostByAdmin($id: ID!, $type: String!) { 
+  DeletePostByAdmin(id: $id,type:$type)
    }
 `;
 
@@ -1154,6 +1154,7 @@ export const SEND_GROUP_MESSAGE_WITH_FILE = gql`
         type
         filename
         size
+        duration
       }
       replyTo {
         _id
@@ -1259,6 +1260,7 @@ export const SEND_MESSAGE = gql`
         type
         filename
         size
+        duration
       }
       sender {
         id
@@ -1284,6 +1286,7 @@ export const GET_MESSAGES = gql`
         type
         filename
         size
+        duration
       }
       sender {
         id
@@ -1310,6 +1313,7 @@ export const GET_LAST_MESSAGES = gql`
         type
         filename
         size
+        duration
       }
       sender {
         id
@@ -1348,6 +1352,7 @@ export const SEND_MESSAGE_WITH_FILE = gql`
         type
         filename
         size
+        duration
       }
       sender {
         id

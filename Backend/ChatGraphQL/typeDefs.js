@@ -8,6 +8,7 @@ const typeDefs = gql`
     type: String
     filename: String
     size: Int
+    duration: Float
   }
 
 type Message {
@@ -42,6 +43,7 @@ type ClearedChat {
     type: String
     filename: String
     size: Int
+    duration: Float
   }
 
   type Query {
