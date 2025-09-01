@@ -21,6 +21,8 @@ import EmojiPicker from 'emoji-picker-react';
 import { X, Mic, MicOff, Square, Play, Pause, FileText, Image, Video } from "lucide-react";
 import SharedContent from './SharedContent';
 import { useChat } from '../../context/ChatContext';
+import { toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 const ChatList = ({ activeTab, createdGroups }) => {
   const [users, setUsers] = useState([]);
@@ -42,7 +44,9 @@ const ChatList = ({ activeTab, createdGroups }) => {
   const [touchTimer, setTouchTimer] = useState(null);
   const [mobileMenuMsgId, setMobileMenuMsgId] = useState(null);
   const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
+  const [showClearChatConfirm, setShowClearChatConfirm] = useState(false);
   const headerMenuRef = useRef(null);
+  const clearChatConfirmRef = useRef(null);
   const [selectedFile, setSelectedFile] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
   const [showGifPicker, setShowGifPicker] = useState(false);
@@ -1873,27 +1877,37 @@ const ChatList = ({ activeTab, createdGroups }) => {
 
   // Clear Chat Function
   const handleClearChat = async () => {
-    /* console.log(...) */ void 0;
-
-    /* console.log(...) */ void 0;
-    /* console.log(...) */ void 0;
-    /* console.log(...) */ void 0;
-    /* console.log(...) */ void 0;
-
     if (!selectedChat || !sender) {
-      /* console.log(...) */ void 0;
-      /* console.log(...) */ void 0;
-      /* console.log(...) */ void 0;
-      alert('Please select a chat to clear');
+      toast.error('Please select a chat to clear');
       return;
     }
+    
+    // Show the custom confirmation dialog
+    setShowClearChatConfirm(true);
+  };
 
-    /* console.log(...) */ void 0;
-    const confirmClear = window.confirm(`Are you sure you want to clear chat with ${selectedChat.name}? This action cannot be undone.`);
-
-    if (!confirmClear) {
-      /* console.log(...) */ void 0;
-      return;
+  // Handle confirm clear chat
+  const confirmClearChat = async () => {
+    setShowClearChatConfirm(false);
+    setHeaderMenuOpen(false);
+    
+    try {
+      // Clear messages from local state immediately for instant UI feedback
+      setMessages([]);
+      
+      // Execute GraphQL mutation
+      const result = await clearChatMutation({
+        variables: {
+          userId: sender.id,
+          chatWithUserId: selectedChat.id
+        }
+      });
+      
+      toast.success(`Chat with ${selectedChat.name} has been cleared successfully`);
+    } catch (error) {
+      console.error('Error clearing chat:', error);
+      toast.error('Failed to clear chat. Please try again.');
+      // Optionally, you might want to refetch messages here to restore the UI
     }
 
     /* console.log(...) */ void 0;
@@ -2574,7 +2588,6 @@ const ChatList = ({ activeTab, createdGroups }) => {
                         onClick={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
-                        /* console.log(...) */ void 0;
                           handleClearChat();
                         }}
                       >
@@ -3175,12 +3188,49 @@ const ChatList = ({ activeTab, createdGroups }) => {
         accept="video/*"
         style={{ display: 'none' }}
       />
+
+      {/* Clear Chat Confirmation Dialog */}
+      {showClearChatConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={() => setShowClearChatConfirm(false)}>
+          <div 
+            ref={clearChatConfirmRef}
+            className="bg-white rounded-xl p-6 w-96 shadow-xl animate-fadeIn"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold text-gray-800">Clear Chat</h3>
+              <button 
+                onClick={() => setShowClearChatConfirm(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <p className="text-gray-600 mb-6">
+              Are you sure you want to clear all messages in this chat? This action cannot be undone.
+            </p>
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={() => setShowClearChatConfirm(false)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-md border border-gray-300"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmClearChat}
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md"
+              >
+                Clear Chat
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
 
 export default ChatList;
-
 
 
 
