@@ -17,6 +17,7 @@ import { usePersistentLikes, usePersistentCommentDetails } from '../../hooks/use
 import { useRealTimeNotifications } from '../../hooks/useRealTimeNotifications';
 import HeartIconPopup from '../notifications/HeartIconPopup';
 import { GetTokenFromCookie } from '../getToken/GetToken';
+import { toast } from 'react-toastify';
 
 
 const SocialPost = ({
@@ -236,18 +237,8 @@ const SocialPost = ({
           refetchSavedPosts();
         }
         
-        // Show notification
-        addNewNotification({
-          id: Date.now() + Math.random(),
-          type: 'bookmark_removed',
-          message: 'Post removed from saved',
-          sender: {
-            name: 'System',
-            username: 'system',
-            profileImage: 'https://ui-avatars.com/api/?name=System&background=ef4444&color=fff&size=64'
-          },
-          createdAt: new Date().toISOString()
-        });
+        // Show toastify notification
+        toast.success('Post removed from saved! 📌');
       }
     } else {
       // Save post
@@ -260,18 +251,8 @@ const SocialPost = ({
           refetchSavedPosts();
         }
         
-        // Show notification
-        addNewNotification({
-          id: Date.now() + Math.random(),
-          type: 'bookmark_added',
-          message: 'Post saved successfully',
-          sender: {
-            name: 'System',
-            username: 'system',
-            profileImage: 'https://ui-avatars.com/api/?name=System&background=10b981&color=fff&size=64'
-          },
-          createdAt: new Date().toISOString()
-        });
+        // Show toastify notification
+        toast.success('Post saved successfully! 🔖');
       }
     }
     
@@ -299,18 +280,8 @@ const SocialPost = ({
           refetchArchivedPosts();
         }
         
-        // Show notification
-        addNewNotification({
-          id: Date.now() + Math.random(),
-          type: 'unarchive',
-          message: 'Post unarchived successfully',
-          sender: {
-            name: 'System',
-            username: 'system',
-            profileImage: 'https://ui-avatars.com/api/?name=System&background=10b981&color=fff&size=64'
-          },
-          createdAt: new Date().toISOString()
-        });
+        // Show toastify notification
+        toast.success('Post unarchived successfully! 📤');
       } catch (err) {
         console.error('❌ Error unarchiving post:', err.message);
       }
@@ -337,18 +308,8 @@ const SocialPost = ({
           onArchive(postId);
         }
         
-        // Show notification
-        addNewNotification({
-          id: Date.now() + Math.random(),
-          type: 'archive',
-          message: 'Post archived successfully',
-          sender: {
-            name: 'System',
-            username: 'system',
-            profileImage: 'https://ui-avatars.com/api/?name=System&background=f59e0b&color=fff&size=64'
-          },
-          createdAt: new Date().toISOString()
-        });
+        // Show toastify notification
+        toast.success('Post archived successfully! 📥');
       } catch (err) {
         console.error('❌ Error archiving post:', err.message);
       }

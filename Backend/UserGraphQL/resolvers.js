@@ -182,8 +182,16 @@ mySelf: async (_, { userId }, { dataSources }) => {
   
    getAllPosts: async (_, { userId }) => {
   try {
+    // Get current user to fetch their following list
+    const currentUser = await User.findById(userId).populate('following');
+    if (!currentUser) throw new Error("User not found");
 
-    const posts = await Post.find({ createdBy: userId })
+    // Get list of user IDs to fetch posts from (user + following)
+    const followingIds = currentUser.following.map(user => user._id);
+    const userIdsToFetch = [userId, ...followingIds];
+
+    // Fetch posts from user and their following
+    const posts = await Post.find({ createdBy: { $in: userIdsToFetch } })
   .sort({ createdAt: -1 })
   // .limit(1)
   .populate("createdBy", "id name username profileImage")

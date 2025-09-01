@@ -14,7 +14,7 @@ import moment from 'moment';
 import { useNavigate } from 'react-router-dom';
 import GroupChat from './GroupChat';
 import { useQuery, useMutation } from '@apollo/client';
-import { GET_USER_FOLLOWING,GET_USER_GROUPS, SEND_MESSAGE, SEND_MESSAGE_WITH_FILE, DELETE_MESSAGE, GET_MESSAGES, GET_ALL_USERS, GET_GROUP_UNREAD_COUNT, MARK_GROUP_MESSAGE_AS_READ, GET_UNREAD_COUNT, MARK_ALL_MESSAGES_AS_SEEN, GET_LAST_MESSAGES, CLEAR_CHAT } from '../../graphql/mutations';
+import { GET_USER_FOLLOWING, GET_USER_GROUPS, SEND_MESSAGE, SEND_MESSAGE_WITH_FILE, DELETE_MESSAGE, GET_MESSAGES, GET_ALL_USERS, GET_GROUP_UNREAD_COUNT, MARK_GROUP_MESSAGE_AS_READ, GET_UNREAD_COUNT, MARK_ALL_MESSAGES_AS_SEEN, GET_LAST_MESSAGES, CLEAR_CHAT, BLOCK_USER } from '../../graphql/mutations';
 import GifSelector from './GifPicker';
 import { BsEmojiSmile } from "react-icons/bs";
 import EmojiPicker from 'emoji-picker-react';
@@ -52,11 +52,11 @@ const ChatList = ({ activeTab, createdGroups }) => {
   const [removedGroupIds, setRemovedGroupIds] = useState(new Set());
   const [lastMessages, setLastMessages] = useState({});
   const [shouldScrollToBottom, setShouldScrollToBottom] = useState(false);
-  
+
   // Typing indicator states for 1-on-1 chats
   const [isTyping, setIsTyping] = useState(false);
   const [typingUser, setTypingUser] = useState(null);
-  
+
   // Audio recording states
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
@@ -65,14 +65,36 @@ const ChatList = ({ activeTab, createdGroups }) => {
   const recordingTimerRef = useRef(null);
   const [recordedAudio, setRecordedAudio] = useState(null); // For audio preview
   const [audioMessage, setAudioMessage] = useState(""); // For message with audio
-  
+
   // Audio playback states
   const [playingAudio, setPlayingAudio] = useState(null);
   const [audioDuration, setAudioDuration] = useState({});
   const [audioProgress, setAudioProgress] = useState({});
+  const [isShow, setIsShow] = useState(false);
+
   const audioRefs = useRef({});
   const messagesEndRef = useRef(null);
-  
+  const [block] = useMutation(BLOCK_USER);
+
+
+
+  const handleBlockUser = async (userId) => {
+    if (!sender?.id || !userId) { return }
+    try {
+      const { data } = await block({
+        variables: { userId: sender?.id, targetUserId: userId }
+      });
+
+      if (data?.blockUser) {
+
+      }
+    } catch (error) {
+      console.error('Error blocking user:', error);
+    }
+  };
+
+
+
   const navigate = useNavigate();
 
   const sampleMessages = {
@@ -84,7 +106,7 @@ const ChatList = ({ activeTab, createdGroups }) => {
       { id: 1, text: "See you tomorrow!", sender: "them", time: "9:45 AM" },
       { id: 2, text: "Yes, looking forward to it!", sender: "me", time: "9:46 AM" }
     ]
-  };  
+  };
 
   useEffect(() => {
     try {
@@ -93,10 +115,10 @@ const ChatList = ({ activeTab, createdGroups }) => {
         // Ensure ID is always a string
         const userId = decodedUser.id.toString();
         /* console.log(...) */ void 0;
-        
+
         // Set sender with string ID
         setSender({ ...decodedUser, id: userId });
-        
+
         // Join socket room with string user ID
         if (socket.connected) {
           /* console.log(...) */ void 0;
@@ -104,21 +126,21 @@ const ChatList = ({ activeTab, createdGroups }) => {
         } else {
           /* console.log(...) */ void 0;
         }
-        
+
         // Setup reconnection handler
         const handleReconnect = () => {
           /* console.log(...) */ void 0;
           socket.emit("join", userId);
-          
+
           // Request updated online users list
           setTimeout(() => {
             socket.emit("getOnlineUsers");
           }, 500);
         };
-        
+
         // Register connect handler
         socket.on("connect", handleReconnect);
-        
+
         // Cleanup
         return () => {
           socket.off("connect", handleReconnect);
@@ -139,15 +161,15 @@ const ChatList = ({ activeTab, createdGroups }) => {
         // Convert all user IDs to strings for consistent comparison
         const stringifiedUsers = users.map(id => id.toString());
         /* console.log(...) */ void 0;
-        
+
         // Create a new Set with string IDs for consistent comparison
         const onlineSet = new Set(stringifiedUsers);
-        
+
         // Update the online users state
         setOnlineUsers(prevOnlineUsers => {
           // Create a new Set to avoid direct mutation
           const newOnlineUsers = new Set(prevOnlineUsers);
-          
+
           // Add newly online users
           for (const userId of stringifiedUsers) {
             if (!prevOnlineUsers.has(userId)) {
@@ -155,7 +177,7 @@ const ChatList = ({ activeTab, createdGroups }) => {
               newOnlineUsers.add(userId);
             }
           }
-          
+
           // Remove users who went offline
           for (const userId of prevOnlineUsers) {
             if (!stringifiedUsers.includes(userId)) {
@@ -163,21 +185,21 @@ const ChatList = ({ activeTab, createdGroups }) => {
               newOnlineUsers.delete(userId);
             }
           }
-          
+
           return newOnlineUsers;
         });
-        
+
         // Update the users list with the latest online status
         setTimeout(() => {
           updateUsersOnlineStatus();
         }, 100);
-        
+
         // Debug log
       } catch (error) {
         console.error("Error handling online users update:", error);
       }
     };
-    
+
     // Handle socket reconnection
     const handleReconnect = () => {
       try {
@@ -187,7 +209,7 @@ const ChatList = ({ activeTab, createdGroups }) => {
           const userId = sender.id.toString();
           /* console.log(...) */ void 0;
           socket.emit("join", userId);
-          
+
           // Request updated online users list after reconnection
           /* console.log(...) */ void 0;
           setTimeout(() => {
@@ -204,26 +226,26 @@ const ChatList = ({ activeTab, createdGroups }) => {
       try {
         /* console.log(...) */ void 0;
         const { userId, chatWithUserId, senderName } = data;
-        
+
         // If someone cleared the chat with current user
         if (chatWithUserId === sender?.id?.toString() && userId !== sender?.id?.toString()) {
           /* console.log(...) */ void 0;
-          
+
           // If this is the currently selected chat, clear messages
           if (selectedChat?.id?.toString() === userId) {
             setMessages([]);
-            
+
             // Show notification to user
             alert(`${senderName} cleared the chat`);
           }
-          
+
           // Update last messages to remove this conversation
           setLastMessages(prev => {
             const updated = { ...prev };
             delete updated[userId];
             return updated;
           });
-          
+
           // Refetch last messages to ensure consistency
           if (refetchLastMessages) {
             setTimeout(() => {
@@ -231,12 +253,12 @@ const ChatList = ({ activeTab, createdGroups }) => {
             }, 500);
           }
         }
-        
+
         // If current user cleared the chat (confirmation from server)
         if (userId === sender?.id?.toString() && chatWithUserId === selectedChat?.id?.toString()) {
           /* console.log(...) */ void 0;
           setMessages([]);
-          
+
           // Update last messages
           setLastMessages(prev => {
             const updated = { ...prev };
@@ -279,8 +301,8 @@ const ChatList = ({ activeTab, createdGroups }) => {
 
 
   // Apollo queries
-  const { data: usersData, loading: usersLoading, refetch: refetchUsers } = useQuery(GET_ALL_USERS,{variables:{userId: sender?.id}});
-  
+  const { data: usersData, loading: usersLoading, refetch: refetchUsers } = useQuery(GET_ALL_USERS, { variables: { userId: sender?.id } });
+
   const { data: groupsData, loading: groupsLoading, refetch: refetchGroups } = useQuery(GET_USER_GROUPS, {
     variables: { userId: sender?.id },
     skip: !sender?.id
@@ -289,9 +311,9 @@ const ChatList = ({ activeTab, createdGroups }) => {
   // Removed GET_REMOVED_GROUPS query - using real-time socket events instead
 
   const { data: messagesData, loading: messagesLoading, refetch: refetchMessages } = useQuery(GET_MESSAGES, {
-    variables: { 
-      senderId: sender?.id, 
-      receiverId: selectedChat?.id 
+    variables: {
+      senderId: sender?.id,
+      receiverId: selectedChat?.id
     },
     skip: !sender?.id || !selectedChat?.id
   });
@@ -349,14 +371,14 @@ const ChatList = ({ activeTab, createdGroups }) => {
         name: u.name,
         isOnline: u.isOnline
       })));
-      
+
       // Update users with real-time online status from socket
       const updatedUsers = usersData.users.map(user => ({
         ...user,
         // Override isOnline with real-time socket status if available
         isOnline: onlineUsers.has(user.id) ? true : user.isOnline
       }));
-      
+
       setUsers(updatedUsers);
     }
   }, [usersData, onlineUsers]);
@@ -365,23 +387,23 @@ const ChatList = ({ activeTab, createdGroups }) => {
   useEffect(() => {
     if (lastMessagesData?.getLastMessages) {
       /* console.log(...) */ void 0;
-      
+
       const messagesMap = {};
       lastMessagesData.getLastMessages.forEach(msg => {
         // Determine the other user in the conversation
         const otherUserId = msg.sender.id === sender?.id ? msg.receiver.id : msg.sender.id;
         messagesMap[otherUserId] = msg;
       });
-      
+
       setLastMessages(messagesMap);
     }
   }, [lastMessagesData, sender?.id]);
-  
+
   // Function to update users with latest online status
   const updateUsersOnlineStatus = () => {
     setUsers(prevUsers => {
       if (!prevUsers) return prevUsers;
-      
+
       return prevUsers.map(user => ({
         ...user,
         isOnline: onlineUsers.has(user.id) ? true : user.isOnline
@@ -404,8 +426,8 @@ const ChatList = ({ activeTab, createdGroups }) => {
 
     // If message has text, show truncated text
     if (lastMsg.message) {
-      return lastMsg.message.length > 30 
-        ? lastMsg.message.substring(0, 30) + '...' 
+      return lastMsg.message.length > 30
+        ? lastMsg.message.substring(0, 30) + '...'
         : lastMsg.message;
     }
 
@@ -443,12 +465,12 @@ const ChatList = ({ activeTab, createdGroups }) => {
       });
       return;
     }
-    
+
     /* console.log(...) */ void 0;
     const rawToken = GetRawTokenFromCookie();
     /* console.log(...) */ void 0;
     /* console.log(...) */ void 0;
-    
+
     const counts = {};
     for (const group of groupsData.getUserGroups) {
       try {
@@ -467,23 +489,23 @@ const ChatList = ({ activeTab, createdGroups }) => {
             variables: { groupId: group._id }
           })
         });
-        
+
         /* console.log(...) */ void 0;
-        
+
         if (!response.ok) {
           console.error(`❌ HTTP error for group ${group.name}:`, response.status, response.statusText);
           const errorText = await response.text();
           console.error('Error response body:', errorText.substring(0, 200));
           continue; // Skip this group and continue with others
         }
-        
+
         const result = await response.json();
         /* console.log(...) */ void 0;
-        
+
         if (result.errors) {
           console.error(`❌ GraphQL errors for group ${group.name}:`, result.errors);
         }
-        
+
         if (result.data?.getGroupUnreadCount !== undefined) {
           counts[group._id] = result.data.getGroupUnreadCount;
           /* console.log(...) */ void 0;
@@ -494,7 +516,7 @@ const ChatList = ({ activeTab, createdGroups }) => {
         console.error('❌ Error fetching unread count for group:', group._id, error);
       }
     }
-    
+
     setGroupUnreadCounts(counts);
   };
 
@@ -507,14 +529,14 @@ const ChatList = ({ activeTab, createdGroups }) => {
       });
       return;
     }
-    
+
     /* console.log(...) */ void 0;
     const rawToken = GetRawTokenFromCookie();
-    
+
     const counts = {};
     for (const user of usersData.users) {
       if (user.id === sender.id) continue; // Skip self
-      
+
       try {
         const response = await fetch('http://localhost:5000/graphql', {
           method: 'POST',
@@ -528,24 +550,24 @@ const ChatList = ({ activeTab, createdGroups }) => {
                 getUnreadCount(senderId: $senderId, receiverId: $receiverId)
               }
             `,
-            variables: { 
-              senderId: user.id, 
-              receiverId: sender.id 
+            variables: {
+              senderId: user.id,
+              receiverId: sender.id
             }
           })
         });
-        
+
         if (!response.ok) {
           console.error(`❌ HTTP error for user ${user.name}:`, response.status);
           continue;
         }
-        
+
         const result = await response.json();
-        
+
         if (result.errors) {
           console.error(`❌ GraphQL errors for user ${user.name}:`, result.errors);
         }
-        
+
         if (result.data?.getUnreadCount !== undefined) {
           counts[user.id] = result.data.getUnreadCount;
           /* console.log(...) */ void 0;
@@ -554,7 +576,7 @@ const ChatList = ({ activeTab, createdGroups }) => {
         console.error('❌ Error fetching unread count for user:', user.id, error);
       }
     }
-    
+
     setUserUnreadCounts(counts);
   };
 
@@ -567,7 +589,7 @@ const ChatList = ({ activeTab, createdGroups }) => {
       senderId: sender?.id,
       senderName: sender?.name
     });
-    
+
     if (activeTab === 'groups' && groupsData?.getUserGroups && sender?.id) {
       /* console.log(...) */ void 0;
       fetchGroupUnreadCounts();
@@ -585,7 +607,7 @@ const ChatList = ({ activeTab, createdGroups }) => {
       senderId: sender?.id,
       senderName: sender?.name
     });
-    
+
     if (activeTab === 'all' && usersData?.users && sender?.id) {
       /* console.log(...) */ void 0;
       fetchUserUnreadCounts();
@@ -617,8 +639,8 @@ const ChatList = ({ activeTab, createdGroups }) => {
       const handleNewGroupMessage = (newMessage) => {
         // Only update unread count if the message is not from current user
         // and the group is not currently selected
-        if (newMessage.sender.id !== sender.id && 
-            (!selectedChat || selectedChat.id !== newMessage.group._id)) {
+        if (newMessage.sender.id !== sender.id &&
+          (!selectedChat || selectedChat.id !== newMessage.group._id)) {
           setGroupUnreadCounts(prev => ({
             ...prev,
             [newMessage.group._id]: (prev[newMessage.group._id] || 0) + 1
@@ -644,21 +666,21 @@ const ChatList = ({ activeTab, createdGroups }) => {
           ...prev,
           [otherUserId]: newMessage
         }));
-        
+
         // Refetch last messages to ensure fresh data
         if (refetchLastMessages) {
           refetchLastMessages();
         }
-        
+
         // Only update unread count if the message is not from current user
         // and the chat is not currently selected
-        if (newMessage.sender.id !== sender.id && 
-            (!selectedChat || selectedChat.id !== newMessage.sender.id)) {
+        if (newMessage.sender.id !== sender.id &&
+          (!selectedChat || selectedChat.id !== newMessage.sender.id)) {
           setUserUnreadCounts(prev => ({
             ...prev,
             [newMessage.sender.id]: (prev[newMessage.sender.id] || 0) + 1
           }));
-          
+
           /* console.log(...) */ void 0;
         } else if (newMessage.sender.id !== sender.id && selectedChat && selectedChat.id === newMessage.sender.id) {
           // If message is from active chat, mark as read immediately
@@ -708,7 +730,7 @@ const ChatList = ({ activeTab, createdGroups }) => {
         scrollToBottom();
         setShouldScrollToBottom(false); // Reset the flag after scrolling
       }, 150);
-      
+
       return () => clearTimeout(timeoutId);
     }
   }, [shouldScrollToBottom, messages]);
@@ -726,7 +748,7 @@ const ChatList = ({ activeTab, createdGroups }) => {
         }
         return prev;
       });
-      
+
       // Mark messages as read in backend
       markActiveMessagesAsRead();
     }
@@ -768,7 +790,7 @@ const ChatList = ({ activeTab, createdGroups }) => {
           setTimeout(retryFetch, 1000);
         }
       };
-      
+
       // Start retry mechanism after a short delay
       setTimeout(retryFetch, 200);
     }
@@ -780,7 +802,7 @@ const ChatList = ({ activeTab, createdGroups }) => {
   useEffect(() => {
     if (messagesData?.getMessages) {
       setMessages(messagesData.getMessages);
-      
+
       // Pre-populate audio durations from database
       const audioDurations = {};
       messagesData.getMessages.forEach(msg => {
@@ -788,7 +810,7 @@ const ChatList = ({ activeTab, createdGroups }) => {
           audioDurations[msg.id] = msg.media.duration;
         }
       });
-      
+
       if (Object.keys(audioDurations).length > 0) {
         setAudioDuration(prev => ({
           ...prev,
@@ -796,7 +818,7 @@ const ChatList = ({ activeTab, createdGroups }) => {
         }));
         console.log('Pre-populated audio durations:', audioDurations);
       }
-      
+
       // Clear unread count and mark messages as read for the selected chat when messages are loaded
       if (selectedChat && !selectedChat.isGroup) {
         setUserUnreadCounts(prev => {
@@ -808,7 +830,7 @@ const ChatList = ({ activeTab, createdGroups }) => {
           }
           return prev;
         });
-        
+
         // Mark messages as read in backend
         markActiveMessagesAsRead();
       }
@@ -826,10 +848,10 @@ const ChatList = ({ activeTab, createdGroups }) => {
     /* console.log(...) */ void 0;
     /* console.log(...) */ void 0;
     /* console.log(...) */ void 0;
-    
+
     setSelectedChat(updatedGroup);
     /* console.log(...) */ void 0;
-    
+
     // Also update the groups list if needed
     if (refetchGroups) {
       /* console.log(...) */ void 0;
@@ -841,17 +863,17 @@ const ChatList = ({ activeTab, createdGroups }) => {
     try {
       setIsAnimating(true);
       setSelectedChat(user);
-      
+
       // If it's a group, mark all unread messages as read
       if (user.isGroup && user.id) {
         const previousCount = groupUnreadCounts[user.id] || 0;
-        
+
         // Reset unread count immediately for better UX
         setGroupUnreadCounts(prev => ({
           ...prev,
           [user.id]: 0
         }));
-        
+
         // Mark messages as read in the background
         try {
           // Get all unread messages for this group and mark them as read
@@ -880,17 +902,17 @@ const ChatList = ({ activeTab, createdGroups }) => {
               variables: { groupId: user.id, limit: 50, offset: 0 }
             })
           });
-          
+
           const result = await response.json();
           if (result.data?.getGroupMessages) {
             // Find messages not read by current user (excluding own messages)
-            const unreadMessages = result.data.getGroupMessages.filter(msg => 
+            const unreadMessages = result.data.getGroupMessages.filter(msg =>
               msg.sender.id !== sender?.id && // Exclude own messages
               !msg.readBy.some(read => read.user.id === sender?.id)
             );
-            
+
             /* console.log(...) */ void 0;
-            
+
             // Mark each unread message as read
             for (const message of unreadMessages) {
               try {
@@ -913,13 +935,13 @@ const ChatList = ({ activeTab, createdGroups }) => {
       } else if (!user.isGroup && user.id && sender?.id) {
         // If it's a 1-on-1 chat, mark all messages from this user as seen
         const previousCount = userUnreadCounts[user.id] || 0;
-        
+
         // Reset unread count immediately for better UX
         setUserUnreadCounts(prev => ({
           ...prev,
           [user.id]: 0
         }));
-        
+
         // Mark messages as seen in the background
         try {
           await markAllMessagesAsSeenMutation({
@@ -928,7 +950,7 @@ const ChatList = ({ activeTab, createdGroups }) => {
               receiverId: sender.id
             }
           });
-          
+
           /* console.log(...) */ void 0;
         } catch (error) {
           console.error('❌ Error marking 1-on-1 messages as seen:', error);
@@ -939,7 +961,7 @@ const ChatList = ({ activeTab, createdGroups }) => {
           }));
         }
       }
-      
+
       setTimeout(() => setIsAnimating(false), 300);
     } catch (error) {
       console.error("Error selecting chat:", error);
@@ -951,18 +973,18 @@ const ChatList = ({ activeTab, createdGroups }) => {
     return new Promise((resolve) => {
       const video = document.createElement('video');
       video.preload = 'metadata';
-      
+
       video.onloadedmetadata = () => {
         window.URL.revokeObjectURL(video.src);
         const duration = video.duration;
         resolve(duration <= 60); // 60 seconds limit
       };
-      
+
       video.onerror = () => {
         window.URL.revokeObjectURL(video.src);
         resolve(false);
       };
-      
+
       video.src = URL.createObjectURL(file);
     });
   };
@@ -981,10 +1003,10 @@ const ChatList = ({ activeTab, createdGroups }) => {
 
     setSelectedFile(file);
     setShowAttachmentBar(false);
-    
+
     // Don't send immediately - just show preview
     /* console.log(...) */ void 0;
-    
+
     // Reset file input
     event.target.value = '';
   };
@@ -1012,7 +1034,7 @@ const ChatList = ({ activeTab, createdGroups }) => {
   const handleGifSelect = (gif) => {
     try {
       /* console.log(...) */ void 0;
-      
+
       // Create a GIF object similar to file structure
       const gifData = {
         url: gif.url || gif.images?.original?.url,
@@ -1024,10 +1046,10 @@ const ChatList = ({ activeTab, createdGroups }) => {
 
       setSelectedFile(gifData);
       setShowGifPicker(false);
-      
+
       // Don't send immediately - just show preview like images
       /* console.log(...) */ void 0;
-      
+
     } catch (error) {
       console.error("❌ Error selecting GIF:", error);
       alert("GIF select karne mein error aaya");
@@ -1054,10 +1076,10 @@ const ChatList = ({ activeTab, createdGroups }) => {
     }
 
     setIsUploading(true);
-    
+
     // Check if it's a GIF (already has URL) or regular file (needs upload)
     const isGif = file?.isGif || false;
-    
+
     // Create temporary message with media for immediate UI feedback
     const tempMessage = {
       id: `temp-${Date.now()}`,
@@ -1079,7 +1101,7 @@ const ChatList = ({ activeTab, createdGroups }) => {
       },
       isTemporary: true // Flag to identify temporary messages
     };
-    
+
     try {
       /* console.log(...) */ void 0;
       setMessages(prev => {
@@ -1088,7 +1110,7 @@ const ChatList = ({ activeTab, createdGroups }) => {
         /* console.log(...) */ void 0;
         return newMessages;
       });
-      
+
       // Trigger scroll to bottom when sending a file
       setShouldScrollToBottom(true);
 
@@ -1121,13 +1143,13 @@ const ChatList = ({ activeTab, createdGroups }) => {
         if (response?.data?.sendMessage) {
           const realMessage = response.data.sendMessage;
           /* console.log(...) */ void 0;
-          
+
           // Update last message for this conversation
           setLastMessages(prev => ({
             ...prev,
             [selectedChat.id]: realMessage
           }));
-          
+
           setMessages(prev => {
             const replaced = prev.map(msg => {
               if (msg.id === tempMessage.id) {
@@ -1137,10 +1159,10 @@ const ChatList = ({ activeTab, createdGroups }) => {
             });
             return replaced;
           });
-          
+
           // Update chat order to move this conversation to top of sender's chat list
           updateChatOrder(selectedChat.id);
-          
+
           // Emit socket event to notify receiver to move sender to top of their chat list
           socket.emit('updateChatOrder', {
             receiverId: selectedChat.id,
@@ -1192,7 +1214,7 @@ const ChatList = ({ activeTab, createdGroups }) => {
             senderId: realMessage.sender?.id,
             receiverId: realMessage.receiver?.id
           });
-          
+
           setMessages(prev => {
             const replaced = prev.map(msg => {
               if (msg.id === tempMessage.id) {
@@ -1204,16 +1226,16 @@ const ChatList = ({ activeTab, createdGroups }) => {
             /* console.log(...) */ void 0;
             return replaced;
           });
-          
+
           // Update last message for this conversation
           setLastMessages(prev => ({
             ...prev,
             [selectedChat.id]: realMessage
           }));
-          
+
           // Update chat order to move this conversation to top of sender's chat list
           updateChatOrder(selectedChat.id);
-          
+
           // Emit socket event to notify receiver to move sender to top of their chat list
           socket.emit('updateChatOrder', {
             receiverId: selectedChat.id,
@@ -1226,7 +1248,7 @@ const ChatList = ({ activeTab, createdGroups }) => {
       }
 
       /* console.log(...) */ void 0;
-      
+
       // Refresh messages to ensure consistency
       if (refetchMessages) {
         /* console.log(...) */ void 0;
@@ -1248,7 +1270,7 @@ const ChatList = ({ activeTab, createdGroups }) => {
       console.error("❌ Error type:", error.constructor.name);
       console.error("❌ Error message:", error.message);
       console.error("❌ Full error:", error);
-      
+
       // Remove temporary message on error
       console.log("🗑️ Removing temporary message due to error:", tempMessage.id);
       setMessages(prev => {
@@ -1256,7 +1278,7 @@ const ChatList = ({ activeTab, createdGroups }) => {
         /* console.log(...) */ void 0;
         return filtered;
       });
-      
+
       // Detailed error analysis
       if (error.graphQLErrors && error.graphQLErrors.length > 0) {
         console.error("🔗 GRAPHQL ERROR:");
@@ -1279,7 +1301,7 @@ const ChatList = ({ activeTab, createdGroups }) => {
         console.error("📋 Error stack:", error.stack);
         alert("Failed to send media. Please try again.");
       }
-      
+
       console.log("❌ === GRAPHQL MEDIA MESSAGE SEND ERROR END ===");
     } finally {
       /* console.log(...) */ void 0;
@@ -1302,12 +1324,12 @@ const ChatList = ({ activeTab, createdGroups }) => {
   // Handle typing for 1-on-1 chats
   const handleTyping = (e) => {
     setText(e.target.value);
-    
+
     if (selectedChat && !selectedChat.isGroup && sender?.id) {
       if (!isTyping) {
         setIsTyping(true);
         socket.sendUserTyping(selectedChat.id, true, sender.name);
-        
+
         setTimeout(() => {
           setIsTyping(false);
           socket.sendUserTyping(selectedChat.id, false, sender.name);
@@ -1323,17 +1345,17 @@ const ChatList = ({ activeTab, createdGroups }) => {
       await sendAudioMessage();
       return;
     }
-    
+
     // Check if we have a selected file to send
     if (selectedFile) {
       /* console.log(...) */ void 0;
       await sendMediaMessage(selectedFile, text.trim()); // Pass text as caption
       return;
     }
-    
+
     // For text messages
     if (!text.trim()) return;
-    
+
     if (!sender?.id || !selectedChat?.id) {
       alert("Sender ya Receiver select nahi hua");
       return;
@@ -1346,7 +1368,7 @@ const ChatList = ({ activeTab, createdGroups }) => {
         finalMessage = `> ${replyToMsg.message}\n${text}`;
         replyMeta = { replyToId: replyToMsg.id, replyToText: replyToMsg.message };
       }
-      
+
       // Create a temporary message to display immediately
       const tempMessage = {
         id: `temp-${Date.now()}`,
@@ -1362,23 +1384,23 @@ const ChatList = ({ activeTab, createdGroups }) => {
         },
         isTemporary: true // Flag to identify temporary messages
       };
-      
+
       // Add the temporary message to the UI immediately
       setMessages(prev => [...prev, tempMessage]);
-      
+
       // Trigger scroll to bottom when sending a message
       setShouldScrollToBottom(true);
-      
+
       // Clear input after send
       setText("");
       setReplyToMsg(null);
-      
+
       // Stop typing indicator when message is sent
       if (selectedChat && !selectedChat.isGroup && sender?.id) {
         setIsTyping(false);
         socket.sendUserTyping(selectedChat.id, false, sender.name);
       }
-      
+
       // Now send the message to the server using GraphQL mutation
       const response = await sendMessageMutation({
         variables: {
@@ -1388,23 +1410,23 @@ const ChatList = ({ activeTab, createdGroups }) => {
           media: null
         }
       });
-      
+
       // Replace the temporary message with the real one from the server
       if (response?.data?.sendMessage) {
         const realMessage = response.data.sendMessage;
-        setMessages(prev => prev.map(msg => 
+        setMessages(prev => prev.map(msg =>
           msg.id === tempMessage.id ? realMessage : msg
         ));
-        
+
         // Update last message for this conversation
         setLastMessages(prev => ({
           ...prev,
           [selectedChat.id]: realMessage
         }));
-        
+
         // Update chat order to move this conversation to top of sender's chat list
         updateChatOrder(selectedChat.id);
-        
+
         // Emit socket event to notify receiver to move sender to top of their chat list
         socket.emit('updateChatOrder', {
           receiverId: selectedChat.id,
@@ -1421,7 +1443,7 @@ const ChatList = ({ activeTab, createdGroups }) => {
       alert("Failed to send message. Please try again.");
     }
   }
-  
+
   // Function to delete a message
   const deleteMessage = async (messageId) => {
     try {
@@ -1430,11 +1452,11 @@ const ChatList = ({ activeTab, createdGroups }) => {
           messageId: messageId
         }
       });
-      
+
       // Close any open menus
       setOpenMenuMsgId(null);
       setMobileMenuMsgId(null);
-      
+
       // The socket event will handle removing the message from the UI
       /* console.log(...) */ void 0;
     } catch (error) {
@@ -1446,7 +1468,7 @@ const ChatList = ({ activeTab, createdGroups }) => {
   // Direct socket event handler
   useEffect(() => {
     if (!socket) return;
-    
+
     const handleIncomingMessage = (msg) => {
       /* console.log(...) */ void 0;
       console.log("📋 Message details:", {
@@ -1463,33 +1485,33 @@ const ChatList = ({ activeTab, createdGroups }) => {
         receiverName: msg.receiver?.name,
         createdAt: msg.createdAt
       });
-      
+
       console.log("🔍 Current chat context:", {
         selectedChatId: selectedChat?.id,
         selectedChatName: selectedChat?.name,
         currentUserId: sender?.id,
         currentUserName: sender?.name
       });
-      
+
       // If we have a selected chat and the message is related to it, update the messages
       const isRelevantMessage = selectedChat && (
         msg.sender.id === selectedChat.id ||
         msg.receiver.id === selectedChat.id
       );
-      
+
       console.log("🔍 Message relevance check:", {
         isRelevantMessage,
         senderMatchesChat: msg.sender.id === selectedChat?.id,
         receiverMatchesChat: msg.receiver.id === selectedChat?.id
       });
-      
+
       if (isRelevantMessage) {
         /* console.log(...) */ void 0;
         // Update messages state with the new message
         setMessages(prev => {
           /* console.log(...) */ void 0;
           /* console.log(...) */ void 0;
-          
+
           // Check if this message is already in our list (to avoid duplicates)
           const messageExists = prev.some(existingMsg => {
             const exists = existingMsg.id === msg.id;
@@ -1498,47 +1520,47 @@ const ChatList = ({ activeTab, createdGroups }) => {
             }
             return exists;
           });
-          
+
           // Check if this is a message we sent (already in our state with a temp ID)
           // Handle both text messages and media messages
           const isOurTempMessage = prev.some(existingMsg => {
             if (!existingMsg.id.startsWith('temp-')) return false;
-            
+
             // For text messages
             if (msg.message && existingMsg.message) {
               const isMatch = existingMsg.message === msg.message &&
-                             existingMsg.sender.id === msg.sender.id &&
-                             existingMsg.receiver.id === msg.receiver.id;
+                existingMsg.sender.id === msg.sender.id &&
+                existingMsg.receiver.id === msg.receiver.id;
               if (isMatch) {
                 /* console.log(...) */ void 0;
               }
               return isMatch;
             }
-            
+
             // For media messages
             if (msg.media && existingMsg.media) {
               const isMatch = existingMsg.sender.id === msg.sender.id &&
-                             existingMsg.receiver.id === msg.receiver.id &&
-                             existingMsg.media.filename === msg.media.filename &&
-                             existingMsg.media.type === msg.media.type;
+                existingMsg.receiver.id === msg.receiver.id &&
+                existingMsg.media.filename === msg.media.filename &&
+                existingMsg.media.type === msg.media.type;
               if (isMatch) {
                 /* console.log(...) */ void 0;
               }
               return isMatch;
             }
-            
+
             return false;
           });
-          
+
           if (messageExists) {
             /* console.log(...) */ void 0;
             return prev;
           }
-          
+
           /* console.log(...) */ void 0;
           /* console.log(...) */ void 0;
           /* console.log(...) */ void 0;
-          
+
           // If this is our own message that we already added as a temp message,
           // replace the temp message with the real one
           if (isOurTempMessage && msg.sender.id === sender?.id) {
@@ -1547,33 +1569,33 @@ const ChatList = ({ activeTab, createdGroups }) => {
               if (!existingMsg.id.startsWith('temp-')) {
                 return existingMsg;
               }
-              
+
               /* console.log(...) */ void 0;
-              
+
               // For text messages
               if (msg.message && existingMsg.message) {
                 const textMatch = existingMsg.message === msg.message &&
-                                 existingMsg.sender.id === msg.sender.id &&
-                                 existingMsg.receiver.id === msg.receiver.id;
+                  existingMsg.sender.id === msg.sender.id &&
+                  existingMsg.receiver.id === msg.receiver.id;
                 console.log("📝 Text message match check:", {
                   messageMatch: existingMsg.message === msg.message,
                   senderMatch: existingMsg.sender.id === msg.sender.id,
                   receiverMatch: existingMsg.receiver.id === msg.receiver.id,
                   overallMatch: textMatch
                 });
-                
+
                 if (textMatch) {
                   /* console.log(...) */ void 0;
                   return msg;
                 }
               }
-              
+
               // For media messages
               if (msg.media && existingMsg.media) {
                 const mediaMatch = existingMsg.sender.id === msg.sender.id &&
-                                  existingMsg.receiver.id === msg.receiver.id &&
-                                  existingMsg.media.filename === msg.media.filename &&
-                                  existingMsg.media.type === msg.media.type;
+                  existingMsg.receiver.id === msg.receiver.id &&
+                  existingMsg.media.filename === msg.media.filename &&
+                  existingMsg.media.type === msg.media.type;
                 console.log("📸 Media message match check:", {
                   senderMatch: existingMsg.sender.id === msg.sender.id,
                   receiverMatch: existingMsg.receiver.id === msg.receiver.id,
@@ -1585,29 +1607,29 @@ const ChatList = ({ activeTab, createdGroups }) => {
                   existingType: existingMsg.media.type,
                   incomingType: msg.media.type
                 });
-                
+
                 if (mediaMatch) {
                   /* console.log(...) */ void 0;
                   return msg;
                 }
               }
-              
+
               return existingMsg;
             });
           }
-          
+
           /* console.log(...) */ void 0;
           const newMessages = [...prev, msg];
           /* console.log(...) */ void 0;
           return newMessages;
         });
-        
+
         // Trigger scroll to bottom when receiving a message
         setShouldScrollToBottom(true);
-        
+
         /* console.log(...) */ void 0;
       }
-      
+
       // Always update lastMessages for any received message (even if not for current chat)
       // This ensures the user list stays sorted correctly
       const otherUserId = msg.sender.id === sender?.id ? msg.receiver.id : msg.sender.id;
@@ -1615,24 +1637,24 @@ const ChatList = ({ activeTab, createdGroups }) => {
         ...prev,
         [otherUserId]: msg
       }));
-      
+
       // Unread count is handled by handleNewMessage function, no need to duplicate here
-      
+
       if (!isRelevantMessage) {
         /* console.log(...) */ void 0;
       }
-      
+
       /* console.log(...) */ void 0;
     };
 
     // Handle message deletion events
     const handleMessageDeleted = (deleteInfo) => {
       /* console.log(...) */ void 0;
-      
+
       // Remove the deleted message from our messages state
       setMessages(prev => prev.filter(msg => msg.id !== deleteInfo.messageId));
     };
-    
+
     // Add socket event listeners
     socket.on("receiveMessage", handleIncomingMessage);
     socket.on("messageDeleted", handleMessageDeleted);
@@ -1643,18 +1665,18 @@ const ChatList = ({ activeTab, createdGroups }) => {
       socket.off("messageDeleted", handleMessageDeleted);
     };
   }, [selectedChat]);
-  
+
   // Add a polling mechanism as a fallback
   useEffect(() => {
     if (!selectedChat || !sender) return;
-    
+
     // Poll for new messages every 3 seconds
     const intervalId = setInterval(() => {
       if (refetchMessages) {
         refetchMessages();
       }
     }, 3000);
-    
+
     // Cleanup stuck temporary messages after 30 seconds
     const cleanupInterval = setInterval(() => {
       setMessages(prev => {
@@ -1673,7 +1695,7 @@ const ChatList = ({ activeTab, createdGroups }) => {
         });
       });
     }, 10000); // Check every 10 seconds
-    
+
     return () => {
       clearInterval(intervalId);
       clearInterval(cleanupInterval);
@@ -1682,7 +1704,7 @@ const ChatList = ({ activeTab, createdGroups }) => {
 
   useEffect(() => {
     if (!showAttachmentBar) return;
-    
+
     try {
       function handleClickOutside(event) {
         try {
@@ -1693,9 +1715,9 @@ const ChatList = ({ activeTab, createdGroups }) => {
           console.error("Error handling click outside attachment bar:", error);
         }
       }
-      
+
       document.addEventListener('mousedown', handleClickOutside);
-      
+
       return () => {
         try {
           document.removeEventListener('mousedown', handleClickOutside);
@@ -1710,7 +1732,7 @@ const ChatList = ({ activeTab, createdGroups }) => {
 
   useEffect(() => {
     if (!showGifPicker) return;
-    
+
     try {
       function handleClickOutside(event) {
         try {
@@ -1721,9 +1743,9 @@ const ChatList = ({ activeTab, createdGroups }) => {
           console.error("Error handling click outside GIF picker:", error);
         }
       }
-      
+
       document.addEventListener('mousedown', handleClickOutside);
-      
+
       return () => {
         try {
           document.removeEventListener('mousedown', handleClickOutside);
@@ -1745,7 +1767,7 @@ const ChatList = ({ activeTab, createdGroups }) => {
 
   useEffect(() => {
     if (!headerMenuOpen) return;
-    
+
     try {
       function handleClickOutside(event) {
         try {
@@ -1756,9 +1778,9 @@ const ChatList = ({ activeTab, createdGroups }) => {
           console.error("Error handling click outside header menu:", error);
         }
       }
-      
+
       document.addEventListener('mousedown', handleClickOutside);
-      
+
       return () => {
         try {
           document.removeEventListener('mousedown', handleClickOutside);
@@ -1780,84 +1802,84 @@ const ChatList = ({ activeTab, createdGroups }) => {
           mediaRecorder.stream.getTracks().forEach(track => track.stop());
         }
       }
-      
+
       if (recordingTimerRef.current) {
         clearInterval(recordingTimerRef.current);
       }
     };
   }, [isRecording, mediaRecorder]);
 
-   const videocall = () => {
-     if (!selectedChat) {
-       alert('Please select a user to call');
-       return;
-     }
+  const videocall = () => {
+    if (!selectedChat) {
+      alert('Please select a user to call');
+      return;
+    }
 
-     const decodedUser = GetTokenFromCookie();
-     const roomID = `room_${Date.now()}`;
-     const callerID = decodedUser?.id;
-     const calleeID = selectedChat.id;
+    const decodedUser = GetTokenFromCookie();
+    const roomID = `room_${Date.now()}`;
+    const callerID = decodedUser?.id;
+    const calleeID = selectedChat.id;
 
      /* console.log(...) */ void 0;
 
-     // Send socket event to notify callee
-     socket.emit("call-user", {
-       calleeID,
-       roomID,
-       callerID,
-       callerName: decodedUser?.name,
-       callerImage: decodedUser?.profileImage
-     });
+    // Send socket event to notify callee
+    socket.emit("call-user", {
+      calleeID,
+      roomID,
+      callerID,
+      callerName: decodedUser?.name,
+      callerImage: decodedUser?.profileImage
+    });
 
      // Navigate caller to video call page immediately
      /* console.log(...) */ void 0;
-     navigate(`/video-call?roomID=${roomID}&userID=${callerID}`);
-     
-     // Listen for call response (for cleanup purposes)
-     const handleCallAccepted = ({ roomID: acceptedRoomID, calleeID: acceptedCalleeID }) => {
-       if (acceptedRoomID === roomID) {
-         /* console.log(...) */ void 0;
-         socket.off('call-accepted', handleCallAccepted);
-         socket.off('call-declined', handleCallDeclined);
-         // Caller is already on video call page, no need to navigate again
-       }
-     };
+    navigate(`/video-call?roomID=${roomID}&userID=${callerID}`);
 
-     const handleCallDeclined = ({ roomID: declinedRoomID }) => {
-       if (declinedRoomID === roomID) {
+    // Listen for call response (for cleanup purposes)
+    const handleCallAccepted = ({ roomID: acceptedRoomID, calleeID: acceptedCalleeID }) => {
+      if (acceptedRoomID === roomID) {
          /* console.log(...) */ void 0;
-         socket.off('call-accepted', handleCallAccepted);
-         socket.off('call-declined', handleCallDeclined);
+        socket.off('call-accepted', handleCallAccepted);
+        socket.off('call-declined', handleCallDeclined);
+        // Caller is already on video call page, no need to navigate again
+      }
+    };
+
+    const handleCallDeclined = ({ roomID: declinedRoomID }) => {
+      if (declinedRoomID === roomID) {
+         /* console.log(...) */ void 0;
+        socket.off('call-accepted', handleCallAccepted);
+        socket.off('call-declined', handleCallDeclined);
          // Could show a toast notification instead of alert since user is on video call page
          /* console.log(...) */ void 0;
-       }
-     };
+      }
+    };
 
-     // Set up listeners for call response
-     socket.on('call-accepted', handleCallAccepted);
-     socket.on('call-declined', handleCallDeclined);
+    // Set up listeners for call response
+    socket.on('call-accepted', handleCallAccepted);
+    socket.on('call-declined', handleCallDeclined);
 
-     // Auto cleanup after 30 seconds if no response
-     setTimeout(() => {
-       socket.off('call-accepted', handleCallAccepted);
-       socket.off('call-declined', handleCallDeclined);
+    // Auto cleanup after 30 seconds if no response
+    setTimeout(() => {
+      socket.off('call-accepted', handleCallAccepted);
+      socket.off('call-declined', handleCallDeclined);
        /* console.log(...) */ void 0;
        // Could show a toast notification instead of alert since user is on video call page
        /* console.log(...) */ void 0;
-     }, 30000);
-   }
+    }, 30000);
+  }
 
 
 
   // Clear Chat Function
   const handleClearChat = async () => {
     /* console.log(...) */ void 0;
-    
+
     /* console.log(...) */ void 0;
     /* console.log(...) */ void 0;
     /* console.log(...) */ void 0;
     /* console.log(...) */ void 0;
-    
+
     if (!selectedChat || !sender) {
       /* console.log(...) */ void 0;
       /* console.log(...) */ void 0;
@@ -1868,28 +1890,28 @@ const ChatList = ({ activeTab, createdGroups }) => {
 
     /* console.log(...) */ void 0;
     const confirmClear = window.confirm(`Are you sure you want to clear chat with ${selectedChat.name}? This action cannot be undone.`);
-    
+
     if (!confirmClear) {
       /* console.log(...) */ void 0;
       return;
     }
-    
+
     /* console.log(...) */ void 0;
 
     try {
       /* console.log(...) */ void 0;
-      console.log('🧹 Clearing chat with data:', { 
-        userId: sender.id, 
+      console.log('🧹 Clearing chat with data:', {
+        userId: sender.id,
         chatWithUserId: selectedChat.id,
         senderName: sender.name,
         selectedChatName: selectedChat.name
       });
-      
+
       /* console.log(...) */ void 0;
       // Clear messages from local state immediately for instant UI feedback
       setMessages([]);
       /* console.log(...) */ void 0;
-      
+
       /* console.log(...) */ void 0;
       // Execute GraphQL mutation
       const result = await clearChatMutation({
@@ -1941,20 +1963,20 @@ const ChatList = ({ activeTab, createdGroups }) => {
           }
         }, 700);
       }
-      
+
       // Close the menu
       setHeaderMenuOpen(false);
-      
+
       /* console.log(...) */ void 0;
       alert(`Chat with ${selectedChat.name} has been cleared`);
-      
+
     } catch (error) {
       console.error('❌ === CLEAR CHAT ERROR ===');
       console.error('❌ Error type:', error.constructor.name);
       console.error('❌ Error message:', error.message);
       console.error('❌ Full error object:', error);
       console.error('❌ Error stack:', error.stack);
-      
+
       // Check for specific GraphQL errors
       if (error.graphQLErrors && error.graphQLErrors.length > 0) {
         console.error('🔗 GraphQL Errors:');
@@ -1967,11 +1989,11 @@ const ChatList = ({ activeTab, createdGroups }) => {
           });
         });
       }
-      
+
       if (error.networkError) {
         console.error('🌐 Network Error:', error.networkError);
       }
-      
+
       // Restore messages if mutation failed
       if (refetchMessages) {
         /* console.log(...) */ void 0;
@@ -1982,7 +2004,7 @@ const ChatList = ({ activeTab, createdGroups }) => {
           console.error('❌ Error restoring messages:', restoreError);
         }
       }
-      
+
       console.error('❌ === CLEAR CHAT ERROR END ===');
       alert(`Failed to clear chat: ${error.message}. Please try again.`);
     }
@@ -1992,75 +2014,75 @@ const ChatList = ({ activeTab, createdGroups }) => {
   const startRecording = async () => {
     try {
       /* console.log(...) */ void 0;
-      
+
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         console.error('❌ MediaRecorder not supported');
         alert('Audio recording not supported in this browser');
         return;
       }
-      
-      const stream = await navigator.mediaDevices.getUserMedia({ 
+
+      const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
           sampleRate: 44100
-        } 
+        }
       });
-      
+
       const recorder = new MediaRecorder(stream, {
         mimeType: 'audio/webm;codecs=opus'
       });
-      
+
       const chunks = [];
-      
+
       recorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
           chunks.push(event.data);
         }
       };
-      
+
       recorder.onstop = async () => {
         /* console.log(...) */ void 0;
         const audioBlob = new Blob(chunks, { type: 'audio/webm;codecs=opus' });
-        
+
         const audioFile = new File([audioBlob], `audio_${Date.now()}.webm`, {
           type: 'audio/webm;codecs=opus'
         });
-        
+
         console.log('🎤 Audio file created:', {
           name: audioFile.name,
           size: audioFile.size,
           type: audioFile.type
         });
-        
+
         // Create audio URL for preview
         const audioUrl = URL.createObjectURL(audioBlob);
-        
+
         // Set recorded audio for preview instead of directly uploading
         setRecordedAudio({
           file: audioFile,
           url: audioUrl,
           duration: recordingTime
         });
-        
+
         stream.getTracks().forEach(track => track.stop());
       };
-      
+
       setMediaRecorder(recorder);
       setAudioChunks(chunks);
       setIsRecording(true);
       setRecordingTime(0);
-      
+
       recordingTimerRef.current = setInterval(() => {
         setRecordingTime(prev => prev + 1);
       }, 1000);
-      
+
       recorder.start();
       /* console.log(...) */ void 0;
-      
+
     } catch (error) {
       console.error('❌ Error starting recording:', error);
-      
+
       let errorMessage = 'Audio recording failed';
       if (error.name === 'NotAllowedError') {
         errorMessage = 'Microphone access denied. Please allow microphone access and try again.';
@@ -2069,7 +2091,7 @@ const ChatList = ({ activeTab, createdGroups }) => {
       } else if (error.name === 'NotSupportedError') {
         errorMessage = 'Audio recording not supported in this browser.';
       }
-      
+
       alert(errorMessage);
     }
   };
@@ -2079,7 +2101,7 @@ const ChatList = ({ activeTab, createdGroups }) => {
       /* console.log(...) */ void 0;
       mediaRecorder.stop();
       setIsRecording(false);
-      
+
       if (recordingTimerRef.current) {
         clearInterval(recordingTimerRef.current);
         recordingTimerRef.current = null;
@@ -2091,18 +2113,18 @@ const ChatList = ({ activeTab, createdGroups }) => {
     if (mediaRecorder && mediaRecorder.state === 'recording') {
       /* console.log(...) */ void 0;
       mediaRecorder.stop();
-      
+
       if (mediaRecorder.stream) {
         mediaRecorder.stream.getTracks().forEach(track => track.stop());
       }
     }
-    
+
     setIsRecording(false);
     setRecordingTime(0);
     setAudioChunks([]);
     setRecordedAudio(null);
     setAudioMessage("");
-    
+
     if (recordingTimerRef.current) {
       clearInterval(recordingTimerRef.current);
       recordingTimerRef.current = null;
@@ -2121,28 +2143,28 @@ const ChatList = ({ activeTab, createdGroups }) => {
   // Function to send audio with message
   const sendAudioMessage = async () => {
     if (!recordedAudio) return;
-    
+
     try {
       /* console.log(...) */ void 0;
       setIsUploading(true);
-      
+
       const formData = new FormData();
       formData.append('file', recordedAudio.file);
       formData.append('duration', recordedAudio.duration.toString()); // Pass duration as string
-      
+
       const response = await fetch('http://localhost:5000/upload-chat-media', {
         method: 'POST',
         body: formData,
         credentials: 'include'
       });
-      
+
       if (!response.ok) {
         throw new Error(`Upload failed: ${response.status}`);
       }
-      
+
       const result = await response.json();
       /* console.log(...) */ void 0;
-      
+
       if (result.success && result.media) {
         const audioResponse = await sendMessageWithFileMutation({
           variables: {
@@ -2152,9 +2174,9 @@ const ChatList = ({ activeTab, createdGroups }) => {
             file: recordedAudio.file
           }
         });
-        
+
         /* console.log(...) */ void 0;
-        
+
         // Update last message for this conversation
         if (audioResponse?.data?.sendMessageWithFile) {
           setLastMessages(prev => ({
@@ -2162,10 +2184,10 @@ const ChatList = ({ activeTab, createdGroups }) => {
             [selectedChat.id]: audioResponse.data.sendMessageWithFile
           }));
         }
-        
+
         // Update chat order to move this conversation to top of sender's chat list
         updateChatOrder(selectedChat.id);
-        
+
         // Emit socket event to notify receiver to move sender to top of their chat list
         socket.emit('updateChatOrder', {
           receiverId: selectedChat.id,
@@ -2174,14 +2196,14 @@ const ChatList = ({ activeTab, createdGroups }) => {
           contentType: 'audio',
           timestamp: Date.now()
         });
-        
+
         // Clean up
         URL.revokeObjectURL(recordedAudio.url);
         setRecordedAudio(null);
         setAudioMessage("");
         setReplyToMsg(null);
       }
-      
+
     } catch (error) {
       console.error('❌ Error uploading audio:', error);
       alert('Audio upload failed. Please try again.');
@@ -2194,23 +2216,23 @@ const ChatList = ({ activeTab, createdGroups }) => {
     try {
       /* console.log(...) */ void 0;
       setIsUploading(true);
-      
+
       const formData = new FormData();
       formData.append('file', audioFile);
-      
+
       const response = await fetch('http://localhost:5000/upload-chat-media', {
         method: 'POST',
         body: formData,
         credentials: 'include'
       });
-      
+
       if (!response.ok) {
         throw new Error(`Upload failed: ${response.status}`);
       }
-      
+
       const result = await response.json();
       /* console.log(...) */ void 0;
-      
+
       if (result.success && result.media) {
         const audioResponse = await sendMessageWithFileMutation({
           variables: {
@@ -2220,9 +2242,9 @@ const ChatList = ({ activeTab, createdGroups }) => {
             file: audioFile
           }
         });
-        
+
         /* console.log(...) */ void 0;
-        
+
         // Update last message for this conversation
         if (audioResponse?.data?.sendMessageWithFile) {
           setLastMessages(prev => ({
@@ -2230,11 +2252,11 @@ const ChatList = ({ activeTab, createdGroups }) => {
             [selectedChat.id]: audioResponse.data.sendMessageWithFile
           }));
         }
-        
+
         setText('');
         setReplyToMsg(null);
       }
-      
+
     } catch (error) {
       console.error('❌ Error uploading audio:', error);
       alert('Audio upload failed. Please try again.');
@@ -2252,7 +2274,7 @@ const ChatList = ({ activeTab, createdGroups }) => {
   // Scroll to bottom function
   const scrollToBottom = () => {
     if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ 
+      messagesEndRef.current.scrollIntoView({
         behavior: 'smooth',
         block: 'end',
         inline: 'nearest'
@@ -2263,7 +2285,7 @@ const ChatList = ({ activeTab, createdGroups }) => {
   // Function to mark messages as read for active chat
   const markActiveMessagesAsRead = async () => {
     if (!selectedChat || selectedChat.isGroup || !sender?.id) return;
-    
+
     try {
       /* console.log(...) */ void 0;
       await markAllMessagesAsSeenMutation({
@@ -2281,11 +2303,11 @@ const ChatList = ({ activeTab, createdGroups }) => {
   // Audio playback functions
   const toggleAudioPlayback = (messageId, audioUrl) => {
     const audio = audioRefs.current[messageId];
-    
+
     if (!audio) {
       const newAudio = new Audio(audioUrl);
       audioRefs.current[messageId] = newAudio;
-      
+
       newAudio.addEventListener('loadedmetadata', () => {
         // Use database duration if available, otherwise use audio file duration
         const msg = messages.find(m => m.id === messageId);
@@ -2295,14 +2317,14 @@ const ChatList = ({ activeTab, createdGroups }) => {
           [messageId]: dbDuration || newAudio.duration
         }));
       });
-      
+
       newAudio.addEventListener('timeupdate', () => {
         setAudioProgress(prev => ({
           ...prev,
           [messageId]: newAudio.currentTime
         }));
       });
-      
+
       newAudio.addEventListener('ended', () => {
         setPlayingAudio(null);
         setAudioProgress(prev => ({
@@ -2310,7 +2332,7 @@ const ChatList = ({ activeTab, createdGroups }) => {
           [messageId]: 0
         }));
       });
-      
+
       newAudio.play();
       setPlayingAudio(messageId);
     } else {
@@ -2320,7 +2342,7 @@ const ChatList = ({ activeTab, createdGroups }) => {
       } else {
         Object.values(audioRefs.current).forEach(a => a.pause());
         setPlayingAudio(null);
-        
+
         audio.play();
         setPlayingAudio(messageId);
       }
@@ -2360,26 +2382,26 @@ const ChatList = ({ activeTab, createdGroups }) => {
   displayedUsers = displayedUsers.sort((a, b) => {
     const aOrder = chatOrder[a.id] || 0;
     const bOrder = chatOrder[b.id] || 0;
-    
+
     // Get last message timestamps
     const aLastMsg = lastMessages[a.id];
     const bLastMsg = lastMessages[b.id];
     const aLastMsgTime = aLastMsg ? new Date(aLastMsg.createdAt).getTime() : 0;
     const bLastMsgTime = bLastMsg ? new Date(bLastMsg.createdAt).getTime() : 0;
-    
+
     // Use the most recent timestamp between chatOrder and lastMessage
     const aFinalTime = Math.max(aOrder, aLastMsgTime);
     const bFinalTime = Math.max(bOrder, bLastMsgTime);
-    
+
     // If both have timestamps, sort by most recent first
     if (aFinalTime && bFinalTime) {
       return bFinalTime - aFinalTime;
     }
-    
+
     // If only one has a timestamp, it goes first
     if (aFinalTime && !bFinalTime) return -1;
     if (!aFinalTime && bFinalTime) return 1;
-    
+
     // If neither has a timestamp, maintain original order
     return 0;
   });
@@ -2396,76 +2418,73 @@ const ChatList = ({ activeTab, createdGroups }) => {
           ) : (
             displayedUsers.map((user) => {
               return (
-              <div
-                key={user.id}
-                onClick={() => handleChatSelect(user)}
-                className={`flex items-center p-4 transition-all duration-200 cursor-pointer hover:bg-gray-50/80 ${selectedChat?.id === user.id ? 'bg-purple-50' : ''}`}
-              >
-                <div className="flex items-center w-full">
-                  <div className="relative flex-shrink-0">
-                    {user.isGroup ? (
-                      <img
-                        src={user.groupImage || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=8B5CF6&color=fff`}
-                        alt={user.name}
-                        className="w-12 h-12 rounded-full object-cover ring-2 ring-purple-100"
-                      />
-                    ) : (
-                      <img
-                        src={user.profileImage || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}`}
-                        alt={user.name}
-                        className="w-12 h-12 rounded-full object-cover ring-2 ring-purple-100"
-                      />
-                    )}
-                    <span className={`absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 border-white ${
-                      user.is_blocked 
-                        ? 'bg-gray-400' 
-                        : (onlineUsers.has(user.id) || user.isOnline === true ? 'bg-green-500 animate-pulse' : 'bg-gray-400')
-                    } transition-colors duration-300`}></span>
-                  </div>
-                  <div className="ml-3 flex-1 min-w-0">
-                    <h3 className="text-sm font-semibold text-gray-900 truncate">
-                      {user.is_blocked ? "Blocked User by Admin" : user.name}
-                    </h3>
-                    <div className="flex items-center justify-between">
-                      <p className={`text-xs ${
-                        user.is_blocked 
-                          ? 'text-gray-400' 
-                          : (onlineUsers.has(user.id) || user.isOnline === true ? 'text-green-500' : 'text-gray-400')
-                      } transition-colors duration-300 flex items-center`}>
-                        <span className={`inline-block w-2 h-2 rounded-full mr-1 ${
-                          user.is_blocked 
-                            ? 'bg-gray-400' 
-                            : (onlineUsers.has(user.id) || user.isOnline === true ? 'bg-green-500 animate-pulse' : 'bg-gray-400')
-                        } transition-colors duration-300`}></span>
-                        {user.is_blocked ? 'Offline' : (onlineUsers.has(user.id) || user.isOnline === true ? 'Online' : 'Offline')}
-                      </p>
-                      {formatLastMessage(user.id) && (
-                        <p className="text-xs text-gray-500 truncate ml-2 max-w-[120px]">
-                          {formatLastMessage(user.id)}
-                        </p>
+                <div
+                  key={user.id}
+                  onClick={() => handleChatSelect(user)}
+                  className={`flex items-center p-4 transition-all duration-200 cursor-pointer hover:bg-gray-50/80 ${selectedChat?.id === user.id ? 'bg-purple-50' : ''}`}
+                >
+                  <div className="flex items-center w-full">
+                    <div className="relative flex-shrink-0">
+                      {user.isGroup ? (
+                        <img
+                          src={user.groupImage || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=8B5CF6&color=fff`}
+                          alt={user.name}
+                          className="w-12 h-12 rounded-full object-cover ring-2 ring-purple-100"
+                        />
+                      ) : (
+                        <img
+                          src={user.profileImage || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}`}
+                          alt={user.name}
+                          className="w-12 h-12 rounded-full object-cover ring-2 ring-purple-100"
+                        />
                       )}
+                      <span className={`absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 border-white ${user.is_blocked
+                          ? 'bg-gray-400'
+                          : (onlineUsers.has(user.id) || user.isOnline === true ? 'bg-green-500 animate-pulse' : 'bg-gray-400')
+                        } transition-colors duration-300`}></span>
                     </div>
+                    <div className="ml-3 flex-1 min-w-0">
+                      <h3 className="text-sm font-semibold text-gray-900 truncate">
+                        {user.is_blocked ? "Blocked User by Admin" : user.name}
+                      </h3>
+                      <div className="flex items-center justify-between">
+                        <p className={`text-xs ${user.is_blocked
+                            ? 'text-gray-400'
+                            : (onlineUsers.has(user.id) || user.isOnline === true ? 'text-green-500' : 'text-gray-400')
+                          } transition-colors duration-300 flex items-center`}>
+                          <span className={`inline-block w-2 h-2 rounded-full mr-1 ${user.is_blocked
+                              ? 'bg-gray-400'
+                              : (onlineUsers.has(user.id) || user.isOnline === true ? 'bg-green-500 animate-pulse' : 'bg-gray-400')
+                            } transition-colors duration-300`}></span>
+                          {user.is_blocked ? 'Offline' : (onlineUsers.has(user.id) || user.isOnline === true ? 'Online' : 'Offline')}
+                        </p>
+                        {formatLastMessage(user.id) && (
+                          <p className="text-xs text-gray-500 truncate ml-2 max-w-[120px]">
+                            {formatLastMessage(user.id)}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Unread count badge for groups */}
+                    {user.isGroup && groupUnreadCounts[user.id] > 0 && (
+                      <div className="flex-shrink-0 ml-2">
+                        <span className="inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-red-500 rounded-full min-w-[20px] h-5">
+                          {groupUnreadCounts[user.id] > 10 ? '10+' : groupUnreadCounts[user.id]}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Unread count badge for 1-on-1 chats */}
+                    {!user.isGroup && userUnreadCounts[user.id] > 0 && (
+                      <div className="flex-shrink-0 ml-2">
+                        <span className="inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-red-500 rounded-full min-w-[20px] h-5">
+                          {userUnreadCounts[user.id] > 10 ? '10+' : userUnreadCounts[user.id]}
+                        </span>
+                      </div>
+                    )}
                   </div>
-                  
-                  {/* Unread count badge for groups */}
-                  {user.isGroup && groupUnreadCounts[user.id] > 0 && (
-                    <div className="flex-shrink-0 ml-2">
-                      <span className="inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-red-500 rounded-full min-w-[20px] h-5">
-                        {groupUnreadCounts[user.id] > 10 ? '10+' : groupUnreadCounts[user.id]}
-                      </span>
-                    </div>
-                  )}
-                  
-                  {/* Unread count badge for 1-on-1 chats */}
-                  {!user.isGroup && userUnreadCounts[user.id] > 0 && (
-                    <div className="flex-shrink-0 ml-2">
-                      <span className="inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-red-500 rounded-full min-w-[20px] h-5">
-                        {userUnreadCounts[user.id] > 10 ? '10+' : userUnreadCounts[user.id]}
-                      </span>
-                    </div>
-                  )}
                 </div>
-              </div>
               );
             })
           )}
@@ -2475,665 +2494,656 @@ const ChatList = ({ activeTab, createdGroups }) => {
         {selectedChat ? (
           selectedChat.isGroup ? (
             <div className="bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] md:ml-8 md:mr-4 overflow-hidden h-full">
-              <GroupChat 
-                group={selectedChat} 
+              <GroupChat
+                group={selectedChat}
                 onBack={() => setSelectedChat(null)}
                 onGroupUpdate={handleGroupUpdate}
               />
             </div>
           ) : (
-          <div className="flex flex-col h-full min-h-0 bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] md:ml-8 md:mr-4 overflow-hidden transform transition-all duration-300 ease-in-out">
+            <div className="flex flex-col h-full min-h-0 bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] md:ml-8 md:mr-4 overflow-hidden transform transition-all duration-300 ease-in-out">
 
-            
-            {/* Header */}
-            <div className="flex-none border-b border-gray-100 p-4 flex items-center justify-between bg-white">
-              <div className="flex items-center">
-                <button
-                  onClick={() => setSelectedChat(null)}
-                  className="md:hidden mr-2 p-2 hover:bg-gray-100 rounded-full transition-colors duration-200"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-600" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
-                </button>
-                <img
-                  src={selectedChat.profileImage || `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedChat.name)}`}
-                  alt={selectedChat.name}
-                  className="w-12 h-12 rounded-full ring-2 ring-purple-100"
-                />
-                <div className="ml-3">
-                  <h2 className="text-lg font-semibold text-gray-900">
-                    {selectedChat.is_blocked ? "Blocked User by Admin" : selectedChat.name}
-                  </h2>
-                  <p className={`text-xs flex items-center ${
-                    selectedChat.is_blocked 
-                      ? 'text-gray-400' 
-                      : (onlineUsers.has(selectedChat?.id) || selectedChat?.isOnline === true ? 'text-green-500' : 'text-gray-400')
-                  } transition-colors duration-300`}>
-                    <span className={`inline-block w-2 h-2 rounded-full mr-1 ${
-                      selectedChat.is_blocked 
-                        ? 'bg-gray-400' 
-                        : (onlineUsers.has(selectedChat?.id) || selectedChat?.isOnline === true ? 'bg-green-500 animate-pulse' : 'bg-gray-400')
-                    } transition-colors duration-300`}></span>
-                    {selectedChat.is_blocked ? 'Offline' : (onlineUsers.has(selectedChat?.id) || selectedChat?.isOnline === true ? 'Online' : 'Offline')}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center space-x-2 mb-[80px] md:mb-0 relative" ref={headerMenuRef}>
-                <button 
-                  className={`p-2 rounded-full ${
-                    selectedChat.is_blocked 
-                      ? 'cursor-not-allowed opacity-50' 
-                      : 'hover:bg-gray-100'
-                  }`}
-                  disabled={selectedChat.is_blocked}
-                >
-                  <PhoneIcon className={`h-5 w-5 ${selectedChat.is_blocked ? 'text-gray-300' : 'text-gray-600'}`} />
-                </button>
-                <button 
-                  className={`p-2 rounded-full ${
-                    selectedChat.is_blocked 
-                      ? 'cursor-not-allowed opacity-50' 
-                      : 'hover:bg-gray-100'
-                  }`}
-                  onClick={() => !selectedChat.is_blocked && videocall()}
-                  disabled={selectedChat.is_blocked}
-                >
-                  <VideoCameraIcon className={`h-5 w-5 ${selectedChat.is_blocked ? 'text-gray-300' : 'text-gray-600'}`} />
-                </button>
-                <button 
-                  className={`p-2 rounded-full ${
-                    selectedChat.is_blocked 
-                      ? 'cursor-not-allowed opacity-50' 
-                      : 'hover:bg-gray-100'
-                  }`}
-                  onClick={() => !selectedChat.is_blocked && setHeaderMenuOpen((v) => !v)}
-                  disabled={selectedChat.is_blocked}
-                >
-                  <EllipsisVerticalIcon className={`h-5 w-5 ${selectedChat.is_blocked ? 'text-gray-300' : 'text-gray-600'}`} />
-                </button>
-                {headerMenuOpen && (
-                  <div className="absolute right-0 top-10 z-50 bg-white border border-gray-200 rounded shadow-md py-1 w-40 flex flex-col animate-fadeIn">
-                    <button 
-                      className="px-4 py-2 text-left text-sm hover:bg-blue-100 text-blue-600 font-semibold" 
-                      type="button"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        /* console.log(...) */ void 0;
-                        handleClearChat();
-                      }}
-                    >
-                      Clear Chat
-                    </button>
-                    <button 
-                      className="px-4 py-2 text-left text-sm hover:bg-red-100 text-red-600 font-semibold" 
-                      type="button"
-                      onClick={() => {
-                        alert('Block button clicked!');
-                        /* console.log(...) */ void 0;
-                      }}
-                    >
-                      Block
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-            {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-4 custom-scrollbar min-h-0 bg-gray-50">
-              <div className="space-y-4">
-                {Array.isArray(messages) && messages.length > 0 && messages.map((msg) => {
-                  const isSent = msg?.sender?.id === sender?.id;
-                  let quoted = null;
-                  let mainText = msg.message;
-                  if (msg.message && msg.message.startsWith('> ')) {
-                    const split = msg.message.split('\n');
-                    quoted = split[0].replace('> ', '');
-                    mainText = split.slice(1).join('\n');
-                  }
-                  // Mobile long-press handlers
-                  const handleTouchStart = () => {
-                    if (window.innerWidth < 768) {
-                      const timer = setTimeout(() => {
-                        setMobileMenuMsgId(msg.id);
-                      }, 500);
-                      setTouchTimer(timer);
-                    }
-                  };
-                  const handleTouchEnd = () => {
-                    if (window.innerWidth < 768 && touchTimer) {
-                      clearTimeout(touchTimer);
-                      setTouchTimer(null);
-                    }
-                  };
-                  return (
-                    <div
-                      key={msg.id}
-                      className={`flex ${isSent ? 'justify-end' : 'justify-start'} relative`}
-                      onMouseEnter={() => setHoveredMsgId(msg.id)}
-                      onMouseLeave={() => { setHoveredMsgId(null); setOpenMenuMsgId(null); }}
-                      onTouchStart={handleTouchStart}
-                      onTouchEnd={handleTouchEnd}
-                    >
-                      {/* For sent messages, arrow/menu on left; for received, on right (desktop only) */}
-                      {isSent && hoveredMsgId === msg.id && (
-                        <div className="hidden md:flex items-center mr-2 relative">
-                          <button
-                            className={`p-1 rounded-full hover:bg-gray-200 focus:outline-none transition-transform duration-200 ${openMenuMsgId === msg.id ? 'rotate-180' : ''}`}
-                            onClick={e => { e.stopPropagation(); setOpenMenuMsgId(msg.id); }}
-                          >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                            </svg>
-                          </button>
-                          {openMenuMsgId === msg.id && (
-                            <div className="absolute z-50 bg-white border border-gray-200 rounded shadow-md py-1 w-32 flex flex-col animate-fadeIn"
-                              style={{ right: '100%', top: '50%', transform: 'translateY(-50%)', marginRight: '8px', animation: 'fadeInLeft 0.2s' }}
-                            >
-                              <button className="px-4 py-2 text-left text-sm hover:bg-gray-100" type="button" onClick={() => { setReplyToMsg(msg); setOpenMenuMsgId(null); }}>Reply</button>
-                              {msg.sender.id === sender?.id && (
-                                <button className="px-4 py-2 text-left text-sm hover:bg-gray-100 text-red-500" type="button" onClick={() => { deleteMessage(msg.id); setOpenMenuMsgId(null); }}>Delete</button>
-                              )}
-                              <button className="px-4 py-2 text-left text-sm hover:bg-red-100 text-red-600 font-semibold" type="button">Block</button>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                      <div className={`max-w-[70%] ${isSent ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-900'} rounded-2xl px-4 py-2`}>
-                        {quoted && (
-                          <div className="text-xs text-purple-300 border-l-4 border-purple-400 pl-2 mb-1 whitespace-pre-line">{quoted}</div>
-                        )}
-                        
-                        {/* Media content */}
-                        {msg.media && (
-                          <div className="mb-2">
-                            {msg.media.type === 'image' && (
-                              <img 
-                                src={msg.media.url} 
-                                alt={msg.media.filename}
-                                className="max-w-full h-auto rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
-                                onClick={() => window.open(msg.media.url, '_blank')}
-                                style={{ maxHeight: '200px' }}
-                              />
-                            )}
-                            {msg.media.type === 'gif' && (
-                              <img 
-                                src={msg.media.url} 
-                                alt={msg.media.filename}
-                                className="max-w-full h-auto rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
-                                onClick={() => window.open(msg.media.url, '_blank')}
-                                style={{ maxHeight: '200px' }}
-                              />
-                            )}
-                            {msg.media.type === 'video' && (
-                              <video 
-                                src={msg.media.url} 
-                                controls
-                                className="max-w-full h-auto rounded-lg"
-                                style={{ maxHeight: '200px' }}
-                              />
-                            )}
-                            {(msg.media.type === 'audio' || msg.media.type?.startsWith('audio/') || msg.media.filename?.endsWith('.webm') || msg.media.filename?.endsWith('.mp3') || msg.media.filename?.endsWith('.wav') || msg.media.filename?.endsWith('.ogg')) && (
-                              <div className="flex items-center space-x-3 p-3 bg-gradient-to-r from-orange-50 to-red-50 rounded-lg border border-orange-200 max-w-xs">
-                                <button
-                                  onClick={() => toggleAudioPlayback(msg.id, msg.media.url)}
-                                  className="flex items-center justify-center w-10 h-10 bg-orange-500 hover:bg-orange-600 rounded-full transition-colors"
-                                >
-                                  {playingAudio === msg.id ? (
-                                    <Pause size={18} className="text-white" />
-                                  ) : (
-                                    <Play size={18} className="text-white ml-0.5" />
-                                  )}
-                                </button>
-                                <div className="flex-1">
-                                  <div className="flex items-center justify-between mb-1">
-                                    <span className="text-xs font-medium text-gray-700">🎵 Voice message</span>
-                                    <span className="text-xs text-gray-500">
-                                      {formatAudioTime(audioProgress[msg.id] || 0)} / {formatAudioTime(audioDuration[msg.id] || 0)}
-                                    </span>
-                                  </div>
-                                  <div className="w-full bg-gray-200 rounded-full h-2">
-                                    <div 
-                                      className="bg-orange-500 h-2 rounded-full transition-all duration-300"
-                                      style={{
-                                        width: `${audioDuration[msg.id] ? (audioProgress[msg.id] / audioDuration[msg.id]) * 100 : 0}%`
-                                      }}
-                                    ></div>
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-                            {msg.media.type === 'file' && (
-                              <div className="flex items-center space-x-2 p-2 bg-white/10 rounded-lg">
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                </svg>
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-sm font-medium truncate">{msg.media.filename}</p>
-                                  <p className="text-xs opacity-70">{(msg.media.size / 1024 / 1024).toFixed(2)} MB</p>
-                                </div>
-                                <button 
-                                  onClick={() => window.open(msg.media.url, '_blank')}
-                                  className="text-xs bg-white/20 px-2 py-1 rounded hover:bg-white/30 transition-colors"
-                                >
-                                  Download
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                        
-                        {/* Shared Content */}
-                        {(() => {
-                          try {
-                            const parsedMessage = JSON.parse(mainText || '{}');
-                            if (parsedMessage.type === 'shared_post' || parsedMessage.type === 'shared_reel') {
-                              return <SharedContent messageData={parsedMessage} />;
-                            }
-                          } catch (e) {
-                            // Not a JSON message, continue with regular text
-                          }
-                          return null;
-                        })()}
-                        
-                        {/* Text message */}
-                        {(() => {
-                          try {
-                            const parsedMessage = JSON.parse(mainText || '{}');
-                            if (parsedMessage.type === 'shared_post' || parsedMessage.type === 'shared_reel') {
-                              return null; // Don't show text for shared content
-                            }
-                          } catch (e) {
-                            // Not a JSON message, show as regular text
-                          }
-                          return mainText && <p className="text-sm whitespace-pre-line">{mainText}</p>;
-                        })()}
-                        
-                        <span className={`text-xs mt-1 block ${isSent ? 'text-purple-200' : 'text-gray-500'}`}>
-                          {moment(msg.createdAt).format('hh:mm A')}
-                        </span>
-                      </div>
-                      {!isSent && hoveredMsgId === msg.id && (
-                        <div className="hidden md:flex items-center ml-2 relative">
-                          <button
-                            className={`p-1 rounded-full hover:bg-gray-200 focus:outline-none transition-transform duration-200 ${openMenuMsgId === msg.id ? 'rotate-180' : ''}`}
-                            onClick={e => { e.stopPropagation(); setOpenMenuMsgId(msg.id); }}
-                          >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                            </svg>
-                          </button>
-                          {openMenuMsgId === msg.id && (
-                            <div className="absolute z-50 bg-white border border-gray-200 rounded shadow-md py-1 w-32 flex flex-col animate-fadeIn"
-                              style={{ left: '100%', top: '50%', transform: 'translateY(-50%)', marginLeft: '8px', animation: 'fadeInLeft 0.2s' }}
-                            >
-                              <button className="px-4 py-2 text-left text-sm hover:bg-gray-100" type="button" onClick={() => { setReplyToMsg(msg); setOpenMenuMsgId(null); }}>Reply</button>
-                              {msg.sender.id === sender?.id && (
-                                <button className="px-4 py-2 text-left text-sm hover:bg-gray-100 text-red-500" type="button" onClick={() => { deleteMessage(msg.id); setOpenMenuMsgId(null); }}>Delete</button>
-                              )}
-                              <button className="px-4 py-2 text-left text-sm hover:bg-red-100 text-red-600 font-semibold" type="button">Block</button>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                      {/* Mobile: show options on long press */}
-                      {mobileMenuMsgId === msg.id && (
-                        <div className="md:hidden absolute z-50 bg-white border border-gray-200 rounded shadow-md py-1 w-32 flex flex-col animate-fadeIn"
-                          style={{ left: '50%', top: '50%', transform: 'translate(-50%,-50%)', animation: 'fadeInLeft 0.2s' }}
-                        >
-                          <button className="px-4 py-2 text-left text-sm hover:bg-gray-100" type="button" onClick={() => { setReplyToMsg(msg); setMobileMenuMsgId(null); }}>Reply</button>
-                          {msg.sender.id === sender?.id && (
-                            <button className="px-4 py-2 text-left text-sm hover:bg-gray-100 text-red-500" type="button" onClick={() => { deleteMessage(msg.id); setMobileMenuMsgId(null); }}>Delete</button>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-                
-                {/* Typing indicator for 1-on-1 chats */}
-                {typingUser && selectedChat && !selectedChat.isGroup && (
-                  <div className="flex items-center space-x-2 mb-2">
-                    <img
-                      src={typingUser.profileImage || `https://ui-avatars.com/api/?name=${encodeURIComponent(typingUser.userName)}&background=8B5CF6&color=fff`}
-                      alt={typingUser.userName}
-                      className="w-6 h-6 rounded-full object-cover"
-                    />
-                    <span className="text-sm text-gray-600">typing...</span>
-                  </div>
-                )}
-                
-                {/* Invisible div for auto-scroll reference */}
-                <div ref={messagesEndRef} />
-              </div>
-            </div>
-            {/* Input - always at bottom, never scrolls */}
-            <div className="flex-none border-t border-gray-100 p-4 bg-white relative z-10">
-              {/* Reply mention UI */}
-              {replyToMsg && (
-                <div className="flex items-center mb-2 px-3 py-1 rounded-lg bg-purple-50 border-l-4 border-purple-400">
-                  <div className="flex-1 min-w-0">
-                    <span className="text-xs text-purple-700 font-semibold">Replying to:</span>
-                    <span className="block text-xs text-gray-700 truncate max-w-xs">{replyToMsg.message}</span>
-                  </div>
-                  <button className="ml-2 p-1 rounded-full hover:bg-purple-100" onClick={() => setReplyToMsg(null)}>
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-purple-700" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+
+              {/* Header */}
+              <div className="flex-none border-b border-gray-100 p-4 flex items-center justify-between bg-white">
+                <div className="flex items-center">
+                  <button
+                    onClick={() => setSelectedChat(null)}
+                    className="md:hidden mr-2 p-2 hover:bg-gray-100 rounded-full transition-colors duration-200"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-600" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
                   </button>
+                  <img
+                    src={selectedChat.profileImage || `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedChat.name)}`}
+                    alt={selectedChat.name}
+                    className="w-12 h-12 rounded-full ring-2 ring-purple-100"
+                  />
+                  <div className="ml-3">
+                    <h2 className="text-lg font-semibold text-gray-900">
+                      {selectedChat.is_blocked ? "Blocked User by Admin" : selectedChat.name}
+                    </h2>
+                    <p className={`text-xs flex items-center ${selectedChat.is_blocked
+                        ? 'text-gray-400'
+                        : (onlineUsers.has(selectedChat?.id) || selectedChat?.isOnline === true ? 'text-green-500' : 'text-gray-400')
+                      } transition-colors duration-300`}>
+                      <span className={`inline-block w-2 h-2 rounded-full mr-1 ${selectedChat.is_blocked
+                          ? 'bg-gray-400'
+                          : (onlineUsers.has(selectedChat?.id) || selectedChat?.isOnline === true ? 'bg-green-500 animate-pulse' : 'bg-gray-400')
+                        } transition-colors duration-300`}></span>
+                      {selectedChat.is_blocked ? 'Offline' : (onlineUsers.has(selectedChat?.id) || selectedChat?.isOnline === true ? 'Online' : 'Offline')}
+                    </p>
+                  </div>
                 </div>
-              )}
-              
-              {/* File Preview Area */}
-              {selectedFile && (
-                <div className="mb-3 relative">
-                  <div className="relative inline-block">
-                    {selectedFile.type.startsWith('image/') ? (
-                      <img
-                        src={URL.createObjectURL(selectedFile)}
-                        alt="Preview"
-                        className="w-20 h-20 object-cover rounded-lg border-2 border-purple-200 shadow-sm"
-                      />
-                    ) : selectedFile.type.startsWith('video/') ? (
-                      <video
-                        src={URL.createObjectURL(selectedFile)}
-                        className="w-20 h-20 object-cover rounded-lg border-2 border-purple-200 shadow-sm"
-                        muted
-                      />
-                    ) : (
-                      <div className="w-20 h-20 bg-purple-100 rounded-lg border-2 border-purple-200 shadow-sm flex items-center justify-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                        </svg>
-                      </div>
-                    )}
-                    {/* Remove button overlay */}
-                    <button
-                      onClick={() => {
-                        setSelectedFile(null);
+                <div className="flex items-center space-x-2 mb-[80px] md:mb-0 relative" ref={headerMenuRef}>
+                  <button
+                    className={`p-2 rounded-full ${selectedChat.is_blocked
+                        ? 'cursor-not-allowed opacity-50'
+                        : 'hover:bg-gray-100'
+                      }`}
+                    disabled={selectedChat.is_blocked}
+                  >
+                    <PhoneIcon className={`h-5 w-5 ${selectedChat.is_blocked ? 'text-gray-300' : 'text-gray-600'}`} />
+                  </button>
+                  <button
+                    className={`p-2 rounded-full ${selectedChat.is_blocked
+                        ? 'cursor-not-allowed opacity-50'
+                        : 'hover:bg-gray-100'
+                      }`}
+                    onClick={() => !selectedChat.is_blocked && videocall()}
+                    disabled={selectedChat.is_blocked}
+                  >
+                    <VideoCameraIcon className={`h-5 w-5 ${selectedChat.is_blocked ? 'text-gray-300' : 'text-gray-600'}`} />
+                  </button>
+                  <button
+                    className={`p-2 rounded-full ${selectedChat.is_blocked
+                        ? 'cursor-not-allowed opacity-50'
+                        : 'hover:bg-gray-100'
+                      }`}
+                    onClick={() => !selectedChat.is_blocked && setHeaderMenuOpen((v) => !v)}
+                    disabled={selectedChat.is_blocked}
+                  >
+                    <EllipsisVerticalIcon className={`h-5 w-5 ${selectedChat.is_blocked ? 'text-gray-300' : 'text-gray-600'}`} />
+                  </button>
+                  {headerMenuOpen && (
+                    <div className="absolute right-0 top-10 z-50 bg-white border border-gray-200 rounded shadow-md py-1 w-40 flex flex-col animate-fadeIn">
+                      <button
+                        className="px-4 py-2 text-left text-sm hover:bg-blue-100 text-blue-600 font-semibold"
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
                         /* console.log(...) */ void 0;
-                      }}
-                      className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center transition-colors duration-200 shadow-lg"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-                  </div>
-                </div>
-              )}
-              
-              <div className="flex items-center gap-2 relative">
-                <button
-                  className={`p-1.5 rounded-full relative ${
-                    selectedChat?.is_blocked
-                      ? 'cursor-not-allowed opacity-50'
-                      : 'hover:bg-gray-100'
-                  }`}
-                  onClick={() => {
-                    if (!selectedChat?.is_blocked) {
-                      /* console.log(...) */ void 0;
-                      setShowAttachmentBar((prev) => !prev);
-                    }
-                  }}
-                  type="button"
-                  disabled={isUploading || selectedChat?.is_blocked}
-                >
-                  {isUploading ? (
-                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-purple-600"></div>
-                  ) : (
-                    <PaperClipIcon className={`h-5 w-5 ${selectedChat?.is_blocked ? 'text-gray-300' : 'text-gray-600'}`} />
+                          handleClearChat();
+                        }}
+                      >
+                        Clear Chat
+                      </button>
+                      <button
+                        className="px-4 py-2 text-left text-sm hover:bg-red-100 text-red-600 font-semibold"
+                        type="button"
+                        onClick={() => {
+                          handleBlockUser(selectedChat?.id);
+                          setIsShow(prev => !prev); // toggle the state
+                        }}
+                      >
+                        {isShow ? 'Unblock' : 'Block'}
+                      </button>
+
+                    </div>
                   )}
-                </button>
-                {showAttachmentBar && (
-                  <div className="absolute left-0 bottom-full mb-2 z-50 flex flex-col bg-white rounded-lg shadow-lg p-2">
-                    <button
-                      className="group p-1 rounded-xl bg-gradient-to-br from-white/80 to-purple-50 flex flex-col items-center gap-0.5 hover:bg-purple-100 hover:scale-105"
-                      type="button"
-                      onClick={() => {
-                        if (photoInputRef.current) photoInputRef.current.click();
-                      }}
-                    >
-                      <span className="flex items-center justify-center w-6 h-6 rounded-full bg-purple-100 group-hover:bg-purple-200 transition-all duration-150">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-purple-600 group-hover:text-purple-800 transition-all duration-150" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <rect x="3" y="5" width="18" height="14" rx="3" stroke="currentColor" strokeWidth="1.5" fill="currentColor" opacity=".08" />
-                          <circle cx="8" cy="9" r="1.5" fill="currentColor" />
-                          <path d="M21 19l-5.5-7-4.5 6-3-4L3 19" stroke="currentColor" strokeWidth="1.2" fill="none" />
-                        </svg>
-                      </span>
-                      <span className="text-[9px] font-semibold text-purple-700 group-hover:text-purple-900 tracking-wide transition-all duration-150">Photo</span>
-                    </button>
-                    <button
-                      className="group p-1 rounded-xl bg-gradient-to-br from-white/80 to-purple-50 flex flex-col items-center gap-0.5 hover:bg-purple-100 hover:scale-105 mt-1"
-                      type="button"
-                      onClick={() => {
-                        if (videoInputRef.current) videoInputRef.current.click();
-                      }}
-                    >
-                      <span className="flex items-center justify-center w-6 h-6 rounded-full bg-purple-100 group-hover:bg-purple-200 transition-all duration-150">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-purple-600 group-hover:text-purple-800 transition-all duration-150" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                        </svg>
-                      </span>
-                      <span className="text-[9px] font-semibold text-purple-700 group-hover:text-purple-900 tracking-wide transition-all duration-150">Video</span>
-                    </button>
-                    <button
-                      className="group p-1 rounded-xl bg-gradient-to-br from-white/80 to-purple-50 flex flex-col items-center gap-0.5 hover:bg-purple-100 hover:scale-105 mt-1"
-                      type="button"
-                      onClick={() => setShowGifPicker(true)}
-                    >
-                      <span className="flex items-center justify-center w-6 h-6 rounded-full bg-purple-100 group-hover:bg-purple-200 transition-all duration-150">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-purple-600 group-hover:text-purple-800 transition-all duration-150" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.5" fill="currentColor" opacity=".08" />
-                          <polygon points="10,9 16,12 10,15" fill="currentColor" />
-                          <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.5" fill="none" />
-                        </svg>
-                      </span>
-                      <span className="text-[9px] font-semibold text-purple-700 group-hover:text-purple-900 tracking-wide transition-all duration-150">GIF</span>
-                    </button>
-                  </div>
-                )}
-                <div className="relative flex-1">
-                  {/* Recording Indicator */}
-                  {isRecording && (
-                    <div className="flex items-center justify-center mb-2 p-2 bg-red-50 border border-red-200 rounded-lg">
-                      <div className="flex items-center space-x-2">
-                        <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
-                        <span className="text-sm font-medium text-red-600">
-                          Recording... {formatRecordingTime(recordingTime)}
-                        </span>
-                        <button
-                          onClick={cancelRecording}
-                          className="ml-2 text-red-500 hover:text-red-700"
-                        >
-                          <X size={16} />
-                        </button>
+                </div>
+              </div>
+              {/* Messages */}
+              <div className="flex-1 overflow-y-auto p-4 custom-scrollbar min-h-0 bg-gray-50">
+                <div className="space-y-4">
+                  {Array.isArray(messages) && messages.length > 0 && messages.map((msg) => {
+                    const isSent = msg?.sender?.id === sender?.id;
+                    let quoted = null;
+                    let mainText = msg.message;
+                    if (msg.message && msg.message.startsWith('> ')) {
+                      const split = msg.message.split('\n');
+                      quoted = split[0].replace('> ', '');
+                      mainText = split.slice(1).join('\n');
+                    }
+                    // Mobile long-press handlers
+                    const handleTouchStart = () => {
+                      if (window.innerWidth < 768) {
+                        const timer = setTimeout(() => {
+                          setMobileMenuMsgId(msg.id);
+                        }, 500);
+                        setTouchTimer(timer);
+                      }
+                    };
+                    const handleTouchEnd = () => {
+                      if (window.innerWidth < 768 && touchTimer) {
+                        clearTimeout(touchTimer);
+                        setTouchTimer(null);
+                      }
+                    };
+                    return (
+                      <div
+                        key={msg.id}
+                        className={`flex ${isSent ? 'justify-end' : 'justify-start'} relative`}
+                        onMouseEnter={() => setHoveredMsgId(msg.id)}
+                        onMouseLeave={() => { setHoveredMsgId(null); setOpenMenuMsgId(null); }}
+                        onTouchStart={handleTouchStart}
+                        onTouchEnd={handleTouchEnd}
+                      >
+                        {/* For sent messages, arrow/menu on left; for received, on right (desktop only) */}
+                        {isSent && hoveredMsgId === msg.id && (
+                          <div className="hidden md:flex items-center mr-2 relative">
+                            <button
+                              className={`p-1 rounded-full hover:bg-gray-200 focus:outline-none transition-transform duration-200 ${openMenuMsgId === msg.id ? 'rotate-180' : ''}`}
+                              onClick={e => { e.stopPropagation(); setOpenMenuMsgId(msg.id); }}
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                              </svg>
+                            </button>
+                            {openMenuMsgId === msg.id && (
+                              <div className="absolute z-50 bg-white border border-gray-200 rounded shadow-md py-1 w-32 flex flex-col animate-fadeIn"
+                                style={{ right: '100%', top: '50%', transform: 'translateY(-50%)', marginRight: '8px', animation: 'fadeInLeft 0.2s' }}
+                              >
+                                <button className="px-4 py-2 text-left text-sm hover:bg-gray-100" type="button" onClick={() => { setReplyToMsg(msg); setOpenMenuMsgId(null); }}>Reply</button>
+                                {msg.sender.id === sender?.id && (
+                                  <button className="px-4 py-2 text-left text-sm hover:bg-gray-100 text-red-500" type="button" onClick={() => { deleteMessage(msg.id); setOpenMenuMsgId(null); }}>Delete</button>
+                                )}
+                                <button className="px-4 py-2 text-left text-sm hover:bg-red-100 text-red-600 font-semibold" type="button">Block</button>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        <div className={`max-w-[70%] ${isSent ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-900'} rounded-2xl px-4 py-2`}>
+                          {quoted && (
+                            <div className="text-xs text-purple-300 border-l-4 border-purple-400 pl-2 mb-1 whitespace-pre-line">{quoted}</div>
+                          )}
+
+                          {/* Media content */}
+                          {msg.media && (
+                            <div className="mb-2">
+                              {msg.media.type === 'image' && (
+                                <img
+                                  src={msg.media.url}
+                                  alt={msg.media.filename}
+                                  className="max-w-full h-auto rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
+                                  onClick={() => window.open(msg.media.url, '_blank')}
+                                  style={{ maxHeight: '200px' }}
+                                />
+                              )}
+                              {msg.media.type === 'gif' && (
+                                <img
+                                  src={msg.media.url}
+                                  alt={msg.media.filename}
+                                  className="max-w-full h-auto rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
+                                  onClick={() => window.open(msg.media.url, '_blank')}
+                                  style={{ maxHeight: '200px' }}
+                                />
+                              )}
+                              {msg.media.type === 'video' && (
+                                <video
+                                  src={msg.media.url}
+                                  controls
+                                  className="max-w-full h-auto rounded-lg"
+                                  style={{ maxHeight: '200px' }}
+                                />
+                              )}
+                              {(msg.media.type === 'audio' || msg.media.type?.startsWith('audio/') || msg.media.filename?.endsWith('.webm') || msg.media.filename?.endsWith('.mp3') || msg.media.filename?.endsWith('.wav') || msg.media.filename?.endsWith('.ogg')) && (
+                                <div className="flex items-center space-x-3 p-3 bg-gradient-to-r from-orange-50 to-red-50 rounded-lg border border-orange-200 max-w-xs">
+                                  <button
+                                    onClick={() => toggleAudioPlayback(msg.id, msg.media.url)}
+                                    className="flex items-center justify-center w-10 h-10 bg-orange-500 hover:bg-orange-600 rounded-full transition-colors"
+                                  >
+                                    {playingAudio === msg.id ? (
+                                      <Pause size={18} className="text-white" />
+                                    ) : (
+                                      <Play size={18} className="text-white ml-0.5" />
+                                    )}
+                                  </button>
+                                  <div className="flex-1">
+                                    <div className="flex items-center justify-between mb-1">
+                                      <span className="text-xs font-medium text-gray-700">🎵 Voice message</span>
+                                      <span className="text-xs text-gray-500">
+                                        {formatAudioTime(audioProgress[msg.id] || 0)} / {formatAudioTime(audioDuration[msg.id] || 0)}
+                                      </span>
+                                    </div>
+                                    <div className="w-full bg-gray-200 rounded-full h-2">
+                                      <div
+                                        className="bg-orange-500 h-2 rounded-full transition-all duration-300"
+                                        style={{
+                                          width: `${audioDuration[msg.id] ? (audioProgress[msg.id] / audioDuration[msg.id]) * 100 : 0}%`
+                                        }}
+                                      ></div>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+                              {msg.media.type === 'file' && (
+                                <div className="flex items-center space-x-2 p-2 bg-white/10 rounded-lg">
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                  </svg>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-medium truncate">{msg.media.filename}</p>
+                                    <p className="text-xs opacity-70">{(msg.media.size / 1024 / 1024).toFixed(2)} MB</p>
+                                  </div>
+                                  <button
+                                    onClick={() => window.open(msg.media.url, '_blank')}
+                                    className="text-xs bg-white/20 px-2 py-1 rounded hover:bg-white/30 transition-colors"
+                                  >
+                                    Download
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Shared Content */}
+                          {(() => {
+                            try {
+                              const parsedMessage = JSON.parse(mainText || '{}');
+                              if (parsedMessage.type === 'shared_post' || parsedMessage.type === 'shared_reel') {
+                                return <SharedContent messageData={parsedMessage} />;
+                              }
+                            } catch (e) {
+                              // Not a JSON message, continue with regular text
+                            }
+                            return null;
+                          })()}
+
+                          {/* Text message */}
+                          {(() => {
+                            try {
+                              const parsedMessage = JSON.parse(mainText || '{}');
+                              if (parsedMessage.type === 'shared_post' || parsedMessage.type === 'shared_reel') {
+                                return null; // Don't show text for shared content
+                              }
+                            } catch (e) {
+                              // Not a JSON message, show as regular text
+                            }
+                            return mainText && <p className="text-sm whitespace-pre-line">{mainText}</p>;
+                          })()}
+
+                          <span className={`text-xs mt-1 block ${isSent ? 'text-purple-200' : 'text-gray-500'}`}>
+                            {moment(msg.createdAt).format('hh:mm A')}
+                          </span>
+                        </div>
+                        {!isSent && hoveredMsgId === msg.id && (
+                          <div className="hidden md:flex items-center ml-2 relative">
+                            <button
+                              className={`p-1 rounded-full hover:bg-gray-200 focus:outline-none transition-transform duration-200 ${openMenuMsgId === msg.id ? 'rotate-180' : ''}`}
+                              onClick={e => { e.stopPropagation(); setOpenMenuMsgId(msg.id); }}
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                              </svg>
+                            </button>
+                            {openMenuMsgId === msg.id && (
+                              <div className="absolute z-50 bg-white border border-gray-200 rounded shadow-md py-1 w-32 flex flex-col animate-fadeIn"
+                                style={{ left: '100%', top: '50%', transform: 'translateY(-50%)', marginLeft: '8px', animation: 'fadeInLeft 0.2s' }}
+                              >
+                                <button className="px-4 py-2 text-left text-sm hover:bg-gray-100" type="button" onClick={() => { setReplyToMsg(msg); setOpenMenuMsgId(null); }}>Reply</button>
+                                {msg.sender.id === sender?.id && (
+                                  <button className="px-4 py-2 text-left text-sm hover:bg-gray-100 text-red-500" type="button" onClick={() => { deleteMessage(msg.id); setOpenMenuMsgId(null); }}>Delete</button>
+                                )}
+                                <button className="px-4 py-2 text-left text-sm hover:bg-red-100 text-red-600 font-semibold" type="button">Block</button>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        {/* Mobile: show options on long press */}
+                        {mobileMenuMsgId === msg.id && (
+                          <div className="md:hidden absolute z-50 bg-white border border-gray-200 rounded shadow-md py-1 w-32 flex flex-col animate-fadeIn"
+                            style={{ left: '50%', top: '50%', transform: 'translate(-50%,-50%)', animation: 'fadeInLeft 0.2s' }}
+                          >
+                            <button className="px-4 py-2 text-left text-sm hover:bg-gray-100" type="button" onClick={() => { setReplyToMsg(msg); setMobileMenuMsgId(null); }}>Reply</button>
+                            {msg.sender.id === sender?.id && (
+                              <button className="px-4 py-2 text-left text-sm hover:bg-gray-100 text-red-500" type="button" onClick={() => { deleteMessage(msg.id); setMobileMenuMsgId(null); }}>Delete</button>
+                            )}
+                          </div>
+                        )}
                       </div>
+                    );
+                  })}
+
+                  {/* Typing indicator for 1-on-1 chats */}
+                  {typingUser && selectedChat && !selectedChat.isGroup && (
+                    <div className="flex items-center space-x-2 mb-2">
+                      <img
+                        src={typingUser.profileImage || `https://ui-avatars.com/api/?name=${encodeURIComponent(typingUser.userName)}&background=8B5CF6&color=fff`}
+                        alt={typingUser.userName}
+                        className="w-6 h-6 rounded-full object-cover"
+                      />
+                      <span className="text-sm text-gray-600">typing...</span>
                     </div>
                   )}
 
-                  {/* Audio Preview */}
-                  {recordedAudio && (
-                    <div className="mb-3 p-3 bg-green-50 border border-green-200 rounded-lg">
-                      <div className="flex items-center space-x-3">
-                        <div className="relative">
-                          <div className="w-16 h-16 bg-green-100 rounded-lg border-2 border-green-200 shadow-sm flex items-center justify-center">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-                            </svg>
-                          </div>
-                          {/* Remove button overlay */}
-                          <button
-                            onClick={cancelAudioPreview}
-                            className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center transition-colors duration-200 shadow-lg"
-                          >
-                            <X size={12} />
-                          </button>
+                  {/* Invisible div for auto-scroll reference */}
+                  <div ref={messagesEndRef} />
+                </div>
+              </div>
+              {/* Input - always at bottom, never scrolls */}
+              <div className="flex-none border-t border-gray-100 p-4 bg-white relative z-10">
+                {/* Reply mention UI */}
+                {replyToMsg && (
+                  <div className="flex items-center mb-2 px-3 py-1 rounded-lg bg-purple-50 border-l-4 border-purple-400">
+                    <div className="flex-1 min-w-0">
+                      <span className="text-xs text-purple-700 font-semibold">Replying to:</span>
+                      <span className="block text-xs text-gray-700 truncate max-w-xs">{replyToMsg.message}</span>
+                    </div>
+                    <button className="ml-2 p-1 rounded-full hover:bg-purple-100" onClick={() => setReplyToMsg(null)}>
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-purple-700" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                  </div>
+                )}
+
+                {/* File Preview Area */}
+                {selectedFile && (
+                  <div className="mb-3 relative">
+                    <div className="relative inline-block">
+                      {selectedFile.type.startsWith('image/') ? (
+                        <img
+                          src={URL.createObjectURL(selectedFile)}
+                          alt="Preview"
+                          className="w-20 h-20 object-cover rounded-lg border-2 border-purple-200 shadow-sm"
+                        />
+                      ) : selectedFile.type.startsWith('video/') ? (
+                        <video
+                          src={URL.createObjectURL(selectedFile)}
+                          className="w-20 h-20 object-cover rounded-lg border-2 border-purple-200 shadow-sm"
+                          muted
+                        />
+                      ) : (
+                        <div className="w-20 h-20 bg-purple-100 rounded-lg border-2 border-purple-200 shadow-sm flex items-center justify-center">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          </svg>
                         </div>
-                        <div className="flex-1">
-                          <p className="text-sm font-medium text-green-800">Voice Message</p>
-                          <p className="text-xs text-green-600">{formatRecordingTime(recordedAudio.duration)}</p>
-                          <div className="mt-2">
-                            <audio controls className="w-full h-8">
-                              <source src={recordedAudio.url} type="audio/webm" />
-                              Your browser does not support the audio element.
-                            </audio>
-                          </div>
-                        </div>
-                      </div>
+                      )}
+                      {/* Remove button overlay */}
+                      <button
+                        onClick={() => {
+                          setSelectedFile(null);
+                        /* console.log(...) */ void 0;
+                        }}
+                        className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center transition-colors duration-200 shadow-lg"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex items-center gap-2 relative">
+                  <button
+                    className={`p-1.5 rounded-full relative ${selectedChat?.is_blocked
+                        ? 'cursor-not-allowed opacity-50'
+                        : 'hover:bg-gray-100'
+                      }`}
+                    onClick={() => {
+                      if (!selectedChat?.is_blocked) {
+                      /* console.log(...) */ void 0;
+                        setShowAttachmentBar((prev) => !prev);
+                      }
+                    }}
+                    type="button"
+                    disabled={isUploading || selectedChat?.is_blocked}
+                  >
+                    {isUploading ? (
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-purple-600"></div>
+                    ) : (
+                      <PaperClipIcon className={`h-5 w-5 ${selectedChat?.is_blocked ? 'text-gray-300' : 'text-gray-600'}`} />
+                    )}
+                  </button>
+                  {showAttachmentBar && (
+                    <div className="absolute left-0 bottom-full mb-2 z-50 flex flex-col bg-white rounded-lg shadow-lg p-2">
+                      <button
+                        className="group p-1 rounded-xl bg-gradient-to-br from-white/80 to-purple-50 flex flex-col items-center gap-0.5 hover:bg-purple-100 hover:scale-105"
+                        type="button"
+                        onClick={() => {
+                          if (photoInputRef.current) photoInputRef.current.click();
+                        }}
+                      >
+                        <span className="flex items-center justify-center w-6 h-6 rounded-full bg-purple-100 group-hover:bg-purple-200 transition-all duration-150">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-purple-600 group-hover:text-purple-800 transition-all duration-150" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <rect x="3" y="5" width="18" height="14" rx="3" stroke="currentColor" strokeWidth="1.5" fill="currentColor" opacity=".08" />
+                            <circle cx="8" cy="9" r="1.5" fill="currentColor" />
+                            <path d="M21 19l-5.5-7-4.5 6-3-4L3 19" stroke="currentColor" strokeWidth="1.2" fill="none" />
+                          </svg>
+                        </span>
+                        <span className="text-[9px] font-semibold text-purple-700 group-hover:text-purple-900 tracking-wide transition-all duration-150">Photo</span>
+                      </button>
+                      <button
+                        className="group p-1 rounded-xl bg-gradient-to-br from-white/80 to-purple-50 flex flex-col items-center gap-0.5 hover:bg-purple-100 hover:scale-105 mt-1"
+                        type="button"
+                        onClick={() => {
+                          if (videoInputRef.current) videoInputRef.current.click();
+                        }}
+                      >
+                        <span className="flex items-center justify-center w-6 h-6 rounded-full bg-purple-100 group-hover:bg-purple-200 transition-all duration-150">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-purple-600 group-hover:text-purple-800 transition-all duration-150" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                          </svg>
+                        </span>
+                        <span className="text-[9px] font-semibold text-purple-700 group-hover:text-purple-900 tracking-wide transition-all duration-150">Video</span>
+                      </button>
+                      <button
+                        className="group p-1 rounded-xl bg-gradient-to-br from-white/80 to-purple-50 flex flex-col items-center gap-0.5 hover:bg-purple-100 hover:scale-105 mt-1"
+                        type="button"
+                        onClick={() => setShowGifPicker(true)}
+                      >
+                        <span className="flex items-center justify-center w-6 h-6 rounded-full bg-purple-100 group-hover:bg-purple-200 transition-all duration-150">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-purple-600 group-hover:text-purple-800 transition-all duration-150" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.5" fill="currentColor" opacity=".08" />
+                            <polygon points="10,9 16,12 10,15" fill="currentColor" />
+                            <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.5" fill="none" />
+                          </svg>
+                        </span>
+                        <span className="text-[9px] font-semibold text-purple-700 group-hover:text-purple-900 tracking-wide transition-all duration-150">GIF</span>
+                      </button>
                     </div>
                   )}
-                  
-                  <div className="flex items-center gap-2">
-                    <div className="relative flex-1">
-                      <input
-                        type="text"
-                        value={recordedAudio ? audioMessage : text}
-                        onChange={(q) => { 
-                          if (recordedAudio) {
-                            setAudioMessage(q.target.value);
-                          } else {
-                            handleTyping(q);
-                          }
-                        }}
-                        onKeyDown={(e) => {
-                          try {
-                            if (e.key === 'Enter' && (recordedAudio || selectedFile || text.trim())) {
-                              e.preventDefault();
-                              chat();
-                            }
-                          } catch (error) {
-                            console.error("Error while sending message on Enter key:", error);
-                          }
-                        }}
-                        placeholder={
-                          selectedChat?.is_blocked 
-                            ? "Cannot message blocked user"
-                            : recordedAudio 
-                              ? "Add a message to your voice note..." 
-                              : selectedFile 
-                                ? "Add a caption to your image..." 
-                                : "Type a message..."
-                        }
-                        disabled={selectedChat?.is_blocked}
-                        className={`w-full border border-gray-200 rounded-full px-3 py-1.5 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
-                          selectedChat?.is_blocked ? 'bg-gray-100 cursor-not-allowed opacity-50' : ''
-                        }`}
-                      />
-                      
-                      {/* Emoji Button */}
-                      <button
-                        type="button"
-                        className={`absolute right-3 top-1/2 transform -translate-y-1/2 text-xl focus:outline-none ${
-                          selectedChat?.is_blocked 
-                            ? 'text-gray-300 cursor-not-allowed' 
-                            : 'text-gray-500 hover:text-purple-500'
-                        }`}
-                        onClick={() => !selectedChat?.is_blocked && setShowEmojiPicker((prev) => !prev)}
-                        disabled={selectedChat?.is_blocked}
-                      >
-                        <BsEmojiSmile />
-                      </button>
-                      
-                      {/* Emoji Picker */}
-                      {showEmojiPicker && (
-                        <div className="absolute bottom-12 right-0 z-50 bg-white shadow-lg rounded-lg p-2 relative">
-                          {/* Close Button */}
+                  <div className="relative flex-1">
+                    {/* Recording Indicator */}
+                    {isRecording && (
+                      <div className="flex items-center justify-center mb-2 p-2 bg-red-50 border border-red-200 rounded-lg">
+                        <div className="flex items-center space-x-2">
+                          <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
+                          <span className="text-sm font-medium text-red-600">
+                            Recording... {formatRecordingTime(recordingTime)}
+                          </span>
                           <button
-                            onClick={() => setShowEmojiPicker(false)}
-                            className="absolute top-1 right-1 text-gray-500 hover:text-red-500 z-10"
+                            onClick={cancelRecording}
+                            className="ml-2 text-red-500 hover:text-red-700"
                           >
                             <X size={16} />
                           </button>
-
-                          <EmojiPicker
-                            onEmojiClick={handleEmojiSelect}
-                            theme="light"
-                          />
                         </div>
-                      )}
-                    </div>
-
-                    <button 
-                      className={`p-2 text-white rounded-full transition-colors duration-200 flex items-center justify-center ${
-                        selectedChat?.is_blocked
-                          ? 'bg-gray-400 cursor-not-allowed opacity-50'
-                          : 'bg-purple-600 hover:bg-purple-700'
-                      }`} 
-                      type="button" 
-                      onClick={() => {
-                        if (!selectedChat?.is_blocked) {
-                          if (isRecording) {
-                            stopRecording();
-                          } else {
-                            startRecording();
-                          }
-                        }
-                      }}
-                      disabled={selectedChat?.is_blocked}
-                    >
-                      {/* Show stop icon if recording, else mic icon */}
-                      {isRecording ? (
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <rect x="8" y="8" width="8" height="8" rx="2" fill="white" />
-                        </svg>
-                      ) : (
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <rect x="9" y="5" width="6" height="8" rx="3" fill="white" />
-                          <path d="M12 17v2" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
-                          <path d="M8 13a4 4 0 008 0" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
-                          <circle cx="12" cy="9" r="3" fill="white" />
-                        </svg>
-                      )}
-                    </button>
-                    <button 
-                      className={`p-2 text-white rounded-full transition-colors duration-200 flex items-center justify-center ${
-                        selectedChat?.is_blocked
-                          ? 'bg-gray-400 cursor-not-allowed opacity-50'
-                          : recordedAudio
-                            ? 'bg-green-600 hover:bg-green-700 animate-pulse'
-                              : selectedFile 
-                              ? 'bg-green-600 hover:bg-green-700 animate-pulse' 
-                            : 'bg-purple-600 hover:bg-purple-700'
-                      }`} 
-                      type="button"
-                      onClick={chat}
-                      disabled={isUploading || selectedChat?.is_blocked}
-                    >
-                      {isUploading ? (
-                        <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                      ) : recordedAudio ? (
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-                        </svg>
-                      ) : selectedFile ? (
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-                        </svg>
-                      ) : (
-                        <PaperAirplaneIcon className="h-5 w-5" />
-                      )}
-                    </button>
-                  </div>
-                  {showGifPicker && (
-                    <div className="absolute left-0 right-0 top-full z-[99999] mt-2">
-                      <div className="bg-white border border-gray-300 rounded-lg p-3 shadow-2xl mx-auto max-w-md w-full min-h-[300px]">
-                        <button 
-                          onClick={() => setShowGifPicker(false)}
-                          className="absolute top-2 right-2 text-gray-500 hover:text-gray-700 text-xl font-bold"
-                        >
-                          ×
-                        </button>
-                        <GifSelector onSelect={handleGifSelect} />
                       </div>
+                    )}
+
+                    {/* Audio Preview */}
+                    {recordedAudio && (
+                      <div className="mb-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+                        <div className="flex items-center space-x-3">
+                          <div className="relative">
+                            <div className="w-16 h-16 bg-green-100 rounded-lg border-2 border-green-200 shadow-sm flex items-center justify-center">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                              </svg>
+                            </div>
+                            {/* Remove button overlay */}
+                            <button
+                              onClick={cancelAudioPreview}
+                              className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center transition-colors duration-200 shadow-lg"
+                            >
+                              <X size={12} />
+                            </button>
+                          </div>
+                          <div className="flex-1">
+                            <p className="text-sm font-medium text-green-800">Voice Message</p>
+                            <p className="text-xs text-green-600">{formatRecordingTime(recordedAudio.duration)}</p>
+                            <div className="mt-2">
+                              <audio controls className="w-full h-8">
+                                <source src={recordedAudio.url} type="audio/webm" />
+                                Your browser does not support the audio element.
+                              </audio>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex items-center gap-2">
+                      <div className="relative flex-1">
+                        <input
+                          type="text"
+                          value={recordedAudio ? audioMessage : text}
+                          onChange={(q) => {
+                            if (recordedAudio) {
+                              setAudioMessage(q.target.value);
+                            } else {
+                              handleTyping(q);
+                            }
+                          }}
+                          onKeyDown={(e) => {
+                            try {
+                              if (e.key === 'Enter' && (recordedAudio || selectedFile || text.trim())) {
+                                e.preventDefault();
+                                chat();
+                              }
+                            } catch (error) {
+                              console.error("Error while sending message on Enter key:", error);
+                            }
+                          }}
+                          placeholder={
+                            selectedChat?.is_blocked
+                              ? "Cannot message blocked user"
+                              : recordedAudio
+                                ? "Add a message to your voice note..."
+                                : selectedFile
+                                  ? "Add a caption to your image..."
+                                  : "Type a message..."
+                          }
+                          disabled={selectedChat?.is_blocked}
+                          className={`w-full border border-gray-200 rounded-full px-3 py-1.5 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent ${selectedChat?.is_blocked ? 'bg-gray-100 cursor-not-allowed opacity-50' : ''
+                            }`}
+                        />
+
+                        {/* Emoji Button */}
+                        <button
+                          type="button"
+                          className={`absolute right-3 top-1/2 transform -translate-y-1/2 text-xl focus:outline-none ${selectedChat?.is_blocked
+                              ? 'text-gray-300 cursor-not-allowed'
+                              : 'text-gray-500 hover:text-purple-500'
+                            }`}
+                          onClick={() => !selectedChat?.is_blocked && setShowEmojiPicker((prev) => !prev)}
+                          disabled={selectedChat?.is_blocked}
+                        >
+                          <BsEmojiSmile />
+                        </button>
+
+                        {/* Emoji Picker */}
+                        {showEmojiPicker && (
+                          <div className="absolute bottom-12 right-0 z-50 bg-white shadow-lg rounded-lg p-2 relative">
+                            {/* Close Button */}
+                            <button
+                              onClick={() => setShowEmojiPicker(false)}
+                              className="absolute top-1 right-1 text-gray-500 hover:text-red-500 z-10"
+                            >
+                              <X size={16} />
+                            </button>
+
+                            <EmojiPicker
+                              onEmojiClick={handleEmojiSelect}
+                              theme="light"
+                            />
+                          </div>
+                        )}
+                      </div>
+
+                      <button
+                        className={`p-2 text-white rounded-full transition-colors duration-200 flex items-center justify-center ${selectedChat?.is_blocked
+                            ? 'bg-gray-400 cursor-not-allowed opacity-50'
+                            : 'bg-purple-600 hover:bg-purple-700'
+                          }`}
+                        type="button"
+                        onClick={() => {
+                          if (!selectedChat?.is_blocked) {
+                            if (isRecording) {
+                              stopRecording();
+                            } else {
+                              startRecording();
+                            }
+                          }
+                        }}
+                        disabled={selectedChat?.is_blocked}
+                      >
+                        {/* Show stop icon if recording, else mic icon */}
+                        {isRecording ? (
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <rect x="8" y="8" width="8" height="8" rx="2" fill="white" />
+                          </svg>
+                        ) : (
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <rect x="9" y="5" width="6" height="8" rx="3" fill="white" />
+                            <path d="M12 17v2" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
+                            <path d="M8 13a4 4 0 008 0" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
+                            <circle cx="12" cy="9" r="3" fill="white" />
+                          </svg>
+                        )}
+                      </button>
+                      <button
+                        className={`p-2 text-white rounded-full transition-colors duration-200 flex items-center justify-center ${selectedChat?.is_blocked
+                            ? 'bg-gray-400 cursor-not-allowed opacity-50'
+                            : recordedAudio
+                              ? 'bg-green-600 hover:bg-green-700 animate-pulse'
+                              : selectedFile
+                                ? 'bg-green-600 hover:bg-green-700 animate-pulse'
+                                : 'bg-purple-600 hover:bg-purple-700'
+                          }`}
+                        type="button"
+                        onClick={chat}
+                        disabled={isUploading || selectedChat?.is_blocked}
+                      >
+                        {isUploading ? (
+                          <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                        ) : recordedAudio ? (
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                          </svg>
+                        ) : selectedFile ? (
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                          </svg>
+                        ) : (
+                          <PaperAirplaneIcon className="h-5 w-5" />
+                        )}
+                      </button>
                     </div>
-                  )}
+                    {showGifPicker && (
+                      <div className="absolute left-0 right-0 top-full z-[99999] mt-2">
+                        <div className="bg-white border border-gray-300 rounded-lg p-3 shadow-2xl mx-auto max-w-md w-full min-h-[300px]">
+                          <button
+                            onClick={() => setShowGifPicker(false)}
+                            className="absolute top-2 right-2 text-gray-500 hover:text-gray-700 text-xl font-bold"
+                          >
+                            ×
+                          </button>
+                          <GifSelector onSelect={handleGifSelect} />
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
           )
         ) : (
           <div className="hidden md:flex flex-1 items-center justify-center bg-white ml-8 mr-4 rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.12)]">
@@ -3147,7 +3157,7 @@ const ChatList = ({ activeTab, createdGroups }) => {
           </div>
         )}
       </div>
-      
+
       {/* Hidden file input for photo selection */}
       <input
         type="file"
@@ -3156,7 +3166,7 @@ const ChatList = ({ activeTab, createdGroups }) => {
         accept="image/*"
         style={{ display: 'none' }}
       />
-      
+
       {/* Hidden file input for video selection */}
       <input
         type="file"
@@ -3174,4 +3184,3 @@ export default ChatList;
 
 
 
-  
