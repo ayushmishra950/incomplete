@@ -1229,8 +1229,8 @@ export const MARK_GROUP_MESSAGE_AS_READ = gql`
 `;
 
 export const SEARCH_USERS_FOR_GROUP = gql`
-  query SearchUsers($query: String!) {
-    searchUsers(username: $query) {
+  query SearchUsers($query: String!, $userId: ID!) {
+    searchUsers(username: $query, userId: $userId) {
       id
       name
       username

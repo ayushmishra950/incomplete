@@ -353,22 +353,17 @@ getCommentDetails: async (_, { postId, commentId }) => {
 
 searchUsers: async (_, { username, userId }) => {
   try {
-    // Step 1: Get current user’s blockedUsers & blockedBy
-    const currentUser = await User.findById(userId).select('blockedUsers blockedBy');
-
-    const blockedUserIds = currentUser?.blockedUsers?.map(id => id.toString()) || [];
-    const blockedByUserIds = currentUser?.blockedBy?.map(id => id.toString()) || [];
-
-    // Step 2: Merge both lists
-    const allBlockedIds = [...new Set([...blockedUserIds, ...blockedByUserIds])];
-
-    // Step 3: Search and exclude these IDs + current user
+    // Search all users except the current user
     const users = await User.find({
-      $or: [
-        { name: { $regex: username, $options: 'i' } },
-        { username: { $regex: username, $options: 'i' } }
-      ],
-      _id: { $nin: [...allBlockedIds, userId] }
+      $and: [
+        {
+          $or: [
+            { name: { $regex: username, $options: 'i' } },
+            { username: { $regex: username, $options: 'i' } }
+          ]
+        },
+        { _id: { $ne: userId } }  // Exclude current user
+      ]
     })
       .select('id name username email phone isPrivate is_blocked profileImage bio createTime followers following posts')
       .populate('followers', 'id name')

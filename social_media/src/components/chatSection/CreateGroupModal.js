@@ -15,8 +15,11 @@ const CreateGroupModal = ({ isOpen, onClose, onGroupCreated }) => {
   const { data: currentUserData } = useQuery(GET_ME);
   const [createGroup, { loading }] = useMutation(CREATE_GROUP);
   const { data: searchResults, loading: searchLoading } = useQuery(SEARCH_USERS_FOR_GROUP, {
-    variables: { query: debouncedSearchQuery },
-    skip: debouncedSearchQuery.length < 2
+    variables: { 
+      query: debouncedSearchQuery,
+      userId: currentUserData?.getMe?.id || ''
+    },
+    skip: debouncedSearchQuery.length < 2 || !currentUserData?.getMe?.id
   });
 
   // Debounce search query
