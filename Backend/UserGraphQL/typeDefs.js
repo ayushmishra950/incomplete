@@ -162,9 +162,16 @@ const typeDefs = gql`
     users(userId : ID): [User]
    getAllUsers(userId : ID): [User]
     getFollowRequestsByUser(userId: ID!): [FollowRequest!]!
+    getLikedImagePostsByUser(userId: ID!): [Post!]!
+getCommentedImagePostsByUser(userId: ID!): [Post!]!
+getLikedVideoPostsByUser(userId: ID!): [Post!]!
+getLikedReelsByUser(userId: ID!): [Video!]!
+getCommentedReelsByUser(userId: ID!): [Video!]!
+getCommentedVideoPostsByUser(userId: ID!): [Post!]!
     getMe: User
     getUserBlockList(userId : ID): User
     getAllPosts(userId : ID): [Post]
+    getUserOwnPosts(userId: ID!): [Post]
     getUserFollowing(userId: ID!): [UserBasic]
     getFollowers(userId : ID): [User!]!
   getHiddenFromStory(userId : ID): [User!]!

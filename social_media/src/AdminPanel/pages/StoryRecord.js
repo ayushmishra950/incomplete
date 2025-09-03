@@ -1,11 +1,41 @@
 "use client"
 
-import { useState } from "react"
+import { useState,useEffect} from "react"
 import { Eye, MessageCircle, User } from "lucide-react"
+import { GET_ACHIVE_STORIES_BY_USERS, GET_MY_STORIES } from "../../graphql/mutations"
+import { useQuery, useMutation } from '@apollo/client';
+import { GetTokenFromCookie } from '../../components/getToken/GetToken';
 
-const StoryRecord = ({ onBack }) => {
+const StoryRecord = ({ onBack,selectedUser }) => {
   const [activeTab, setActiveTab] = useState("All Stories")
+    const [token, setToken] = useState();
+  
+    useEffect(() => {
+        const decodedUser = GetTokenFromCookie();
+        if (decodedUser?.id) {
+          setToken(decodedUser);
+          
+        }
+      }, []);
+    // Auto-refresh stories every 30 seconds to show newly uploaded stories
+  
+  // Use GET_MY_STORIES instead of GET_ACHIVE_STORIES_BY_USERS to get all user stories
+  const { data: storyData, loading: storyLoading, error: storyError, refetch: refetchStories } = useQuery(GET_MY_STORIES, { 
+    variables: { userId: selectedUser?.id },
+    skip: !selectedUser?.id,
+    fetchPolicy: 'cache-and-network'
+  });
+  console.log('My Stories Data:', storyData)
 
+    useEffect(() => {
+      if (!token?.id) return;
+      
+      const interval = setInterval(() => {
+        refetchStories();
+      }, 30000); // 30 seconds
+
+      return () => clearInterval(interval);
+    }, [token?.id, refetchStories]);
   // Sample data for stories
   const stories = [
     {
@@ -134,12 +164,7 @@ const StoryRecord = ({ onBack }) => {
     }
   }
 
-  const activeStories = stories.filter((story) => story.status === "Active")
-  const expiredStories = stories.filter((story) => story.status === "Expired")
-  const totalStories = stories.length
 
-  const activePercentage = (activeStories.length / totalStories) * 100
-  const expiredPercentage = (expiredStories.length / totalStories) * 100
 
   const recentStories = [
     { date: "Aug 9", replies: 12 },
@@ -161,14 +186,42 @@ const StoryRecord = ({ onBack }) => {
     { day: "Sun", views: 1600 },
   ]
 
+  // Convert backend stories to frontend format
+  const convertedStories = storyData?.getMyStories?.map(story => ({
+    id: story.id,
+    type: story.mediaType === 'image' ? 'post' : story.mediaType === 'video' ? 'reel' : 'post',
+    thumbnail: story.mediaUrl,
+    uploadDate: new Date(story.createdAt).toLocaleDateString('en-GB', { 
+      day: '2-digit', 
+      month: 'short', 
+      year: 'numeric' 
+    }),
+    views: Math.floor(Math.random() * 1000) + 100, // Random views for now
+    replies: Math.floor(Math.random() * 50), // Random replies for now
+    status: new Date(story.expiresAt) > new Date() ? "Active" : "Expired",
+    caption: story.caption,
+    mediaUrl: story.mediaUrl,
+    mediaType: story.mediaType,
+    createdAt: story.createdAt,
+    expiresAt: story.expiresAt,
+    isArchived: story.isArchived
+  })) || [];
+
+    const activeStories = convertedStories.filter((story) => story.status === "Active")
+  const expiredStories = convertedStories.filter((story) => story.status === "Expired")
+  const totalStories = convertedStories.length
+
+  const activePercentage = (activeStories.length / totalStories) * 100
+  const expiredPercentage = (expiredStories.length / totalStories) * 100
+
   const filteredStories = () => {
     switch (activeTab) {
       case "Active Stories":
-        return activeStories
+        return convertedStories.filter(story => story.status === "Active")
       case "Expired Stories":
-        return expiredStories
+        return convertedStories.filter(story => story.status === "Expired")
       default:
-        return stories
+        return convertedStories
     }
   }
 
@@ -187,31 +240,56 @@ const StoryRecord = ({ onBack }) => {
               {/* Stats Cards */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                 <div className="text-center p-4 bg-gray-50 rounded-lg">
-                  <div className="text-3xl font-bold text-gray-900 font-inter tracking-tight">156</div>
+                  <div className="text-3xl font-bold text-gray-900 font-inter tracking-tight">
+                    {storyLoading ? '...' : totalStories}
+                  </div>
                   <div className="text-sm text-gray-600 font-medium">Total Stories</div>
                 </div>
 
                 <div className="text-center p-4 bg-gray-50 rounded-lg">
-                  <div className="text-3xl font-bold text-gray-900 font-inter tracking-tight">326</div>
-                  <div className="text-sm text-gray-600 font-medium">Total Replies</div>
+                  <div className="text-3xl font-bold text-gray-900 font-inter tracking-tight">
+                    {storyLoading ? '...' : activeStories.length}
+                  </div>
+                  <div className="text-sm text-gray-600 font-medium">Active Stories</div>
+                </div>
+
+                <div className="text-center p-4 bg-gray-50 rounded-lg">
+                  <div className="text-3xl font-bold text-gray-900 font-inter tracking-tight">
+                    {storyLoading ? '...' : expiredStories.length}
+                  </div>
+                  <div className="text-sm text-gray-600 font-medium">Expired Stories</div>
                 </div>
               </div>
 
               {/* Navigation Tabs */}
-              <div className="flex space-x-8 border-b border-gray-200 mb-6">
-                {tabs.map((tab) => (
-                  <button
-                    key={tab}
-                    onClick={() => setActiveTab(tab)}
-                    className={`pb-4 px-1 text-sm font-medium transition-colors relative ${
-                      activeTab === tab
-                        ? "text-purple-600 border-b-2 border-purple-600"
-                        : "text-gray-500 hover:text-gray-700"
-                    }`}
-                  >
-                    {tab}
-                  </button>
-                ))}
+              <div className="flex justify-between items-center border-b border-gray-200 mb-6">
+                <div className="flex space-x-8">
+                  {tabs.map((tab) => (
+                    <button
+                      key={tab}
+                      onClick={() => setActiveTab(tab)}
+                      className={`pb-4 px-1 text-sm font-medium transition-colors relative ${
+                        activeTab === tab
+                          ? "text-purple-600 border-b-2 border-purple-600"
+                          : "text-gray-500 hover:text-gray-700"
+                      }`}
+                    >
+                      {tab}
+                    </button>
+                  ))}
+                </div>
+                
+                {/* Refresh Button */}
+                <button
+                  onClick={() => refetchStories()}
+                  disabled={storyLoading}
+                  className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-purple-600 hover:text-purple-700 hover:bg-purple-50 rounded-lg transition-colors disabled:opacity-50"
+                >
+                  <svg className={`w-4 h-4 ${storyLoading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  Refresh
+                </button>
               </div>
 
               {/* Recent Comments/Engagement Section */}
@@ -286,12 +364,16 @@ const StoryRecord = ({ onBack }) => {
               <div className="space-y-3 mb-6">
                 <div className="flex justify-between">
                   <span className="text-gray-600 font-medium">Total Stories</span>
-                  <span className="font-bold text-gray-900 font-inter">156</span>
+                  <span className="font-bold text-gray-900 font-inter">
+                    {storyLoading ? '...' : totalStories}
+                  </span>
                 </div>
 
                 <div className="flex justify-between">
-                  <span className="text-gray-600 font-medium">Total Replies</span>
-                  <span className="font-bold text-gray-900 font-inter">425</span>
+                  <span className="text-gray-600 font-medium">Active Stories</span>
+                  <span className="font-bold text-gray-900 font-inter">
+                    {storyLoading ? '...' : activeStories.length}
+                  </span>
                 </div>
               </div>
 
@@ -313,7 +395,9 @@ const StoryRecord = ({ onBack }) => {
                   </svg>
                   <div className="absolute inset-0 flex items-center justify-center">
                     <div className="text-center">
-                      <div className="text-xl font-bold text-gray-900 font-inter tracking-tight">156</div>
+                      <div className="text-xl font-bold text-gray-900 font-inter tracking-tight">
+                        {storyLoading ? '...' : totalStories}
+                      </div>
                       <div className="text-xs text-gray-500 font-medium">Total Stories</div>
                     </div>
                   </div>
@@ -440,10 +524,30 @@ const StoryRecord = ({ onBack }) => {
               ))}
             </div>
 
-            {filteredStories().length === 0 && (
+            {storyLoading && (
+              <div className="text-center py-12">
+                <div className="text-gray-400 mb-2">⏳</div>
+                <p className="text-gray-500">Loading your stories...</p>
+              </div>
+            )}
+
+            {storyError && (
+              <div className="text-center py-12">
+                <div className="text-red-400 mb-2">❌</div>
+                <p className="text-red-500">Error loading stories: {storyError.message}</p>
+                <button 
+                  onClick={() => refetchStories()}
+                  className="mt-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+                >
+                  Retry
+                </button>
+              </div>
+            )}
+
+            {!storyLoading && !storyError && filteredStories().length === 0 && (
               <div className="text-center py-12">
                 <div className="text-gray-400 mb-2">📚</div>
-                <p className="text-gray-500">No stories found for the selected filter.</p>
+                <p className="text-gray-500">No stories found. Upload your first story!</p>
               </div>
             )}
           </div>

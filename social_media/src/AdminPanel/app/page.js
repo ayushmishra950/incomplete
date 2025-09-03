@@ -7,6 +7,8 @@ import UserDetail from "../pages/UserDetail"
 import UserInfo from "../pages/UserInfo"
 import ReelsManagement from "../pages/ManageReels"
 import ManagePosts from "../pages/ManagePosts"
+import AllBlockedUsers from "../pages/AllBlockedUsers"
+import ActiveUsers from "../pages/ActiveUsers"
 
 
 export default function App() {
@@ -20,7 +22,7 @@ export default function App() {
   const renderCurrentPage = () => {
     switch (currentPage) {
       case "Dashboard":
-        return <Dashboard />
+        return <Dashboard setCurrentPage={setCurrentPage} />
       case "User Data":
         return (
           <UserData
@@ -60,6 +62,10 @@ export default function App() {
             }}
           />
         )
+      case "Blocked Users":
+        return <AllBlockedUsers onBack={() => setCurrentPage("Dashboard")} />
+      case "Active Users":
+        return <ActiveUsers onBack={() => setCurrentPage("Dashboard")} />
       default:
         return <Dashboard />
     }

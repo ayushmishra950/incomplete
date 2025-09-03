@@ -16,14 +16,22 @@ export default function Sidebar({
   setIsCollapsed,
 }) {
   // Keeping existing states (not strictly necessary for current behavior)
-  const [isUserManagementOpen, setIsUserManagementOpen] = useState(false)
-  const [isUserDataExpanded, setIsUserDataExpanded] = useState(false)
   const [isAdminManagementOpen, setIsAdminManagementOpen] = useState(false)
 
   const menuItems = [
     { icon: LayoutDashboard, label: "Dashboard", active: currentPage === "Dashboard" },
-    { icon: Users, label: "User Management", active: ["User Data", "UserDetail", "UserInfo"].includes(currentPage) },
-    { icon: FileText, label: "Admin Management", active: ["Manage Reels", "Manage Videos/Posts", "Admin Management"].includes(currentPage) },
+    { 
+      icon: Database, 
+      label: "User Data", 
+      active: currentPage === "User Data",
+      onClick: () => setCurrentPage("User Data")
+    },
+    { 
+      icon: FileText, 
+      label: "Admin Management", 
+      active: ["Manage Reels", "Manage Videos/Posts", "Admin Management"].includes(currentPage),
+      onClick: () => setCurrentPage("Admin Management")
+    },
   ]
 
   return (
@@ -72,50 +80,6 @@ export default function Sidebar({
             const Icon = item.icon
             return (
               <li key={index}>
-                {item.label === "User Management" && (
-                  <>
-                    <button
-                      onClick={() => {
-                        setCurrentPage("User Data")
-                        setIsSidebarOpen(false)
-                      }}
-                      className={`flex items-center rounded-lg transition-colors duration-200 w-full ${
-                        item.active ? "bg-[#B65FCF] text-white" : "text-gray-700 hover:bg-gray-100"
-                      } ${isCollapsed && !isSidebarOpen ? "lg:px-0 lg:py-2 lg:justify-center px-3 py-2 space-x-3" : "px-3 py-2 space-x-3"}`}
-                    >
-                      <Icon size={20} className={`flex-shrink-0 ${isCollapsed && !isSidebarOpen ? "lg:mx-auto" : ""}`} />
-                      <span className={`font-medium transition-opacity duration-300 whitespace-nowrap ${
-                        isCollapsed && !isSidebarOpen ? "opacity-0 hidden lg:opacity-0 lg:hidden" : "opacity-100 block"
-                      }`}>
-                        {item.label}
-                      </span>
-                    </button>
-
-                    {(!isCollapsed || isSidebarOpen) && (
-                      <div className="overflow-hidden transition-all duration-300 ease-in-out max-h-96 opacity-100">
-                        <ul className="ml-8 mt-2 space-y-1">
-                          <li>
-                            <button
-                              onClick={() => {
-                                setCurrentPage("User Data")
-                                setIsSidebarOpen(false)
-                              }}
-                              className={`flex items-center justify-between w-full space-x-3 px-3 py-2 rounded-lg transition-colors duration-200 cursor-pointer ${
-                                currentPage === "User Data" ? "bg-[#B65FCF] text-white" : "text-gray-700 hover:bg-gray-100 hover:text-gray-900"
-                              }`}
-                            >
-                              <div className="flex items-center space-x-3">
-                                <Database size={20} className="flex-shrink-0" />
-                                <span className="font-medium">User Data</span>
-                              </div>
-                            </button>
-                          </li>
-                        </ul>
-                      </div>
-                    )}
-                  </>
-                )}
-
                 {item.label === "Admin Management" && (
                   <>
                     <button

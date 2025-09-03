@@ -49,6 +49,7 @@ export default function UserData({ onViewClick }) {
       }
     }
   });
+  console.log(usersData)  
   
   const [unblockUser] = useMutation(UNBLOCK_ADMIN_BY_USER, {
     update(cache, { data }) {
@@ -122,7 +123,7 @@ export default function UserData({ onViewClick }) {
 
 
   // Real user data from backend
-  const users = usersData?.getAllUsers || [];
+  const users = usersData?.getAllUsersByAdmin || [];
 
   useEffect(() => {
     if (users && users.length > 0) {

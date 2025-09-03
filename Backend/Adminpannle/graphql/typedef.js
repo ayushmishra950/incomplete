@@ -99,11 +99,30 @@ const adminTypeDefs = gql`
     password: String!
   }
 
+  type Story {
+    id: ID!
+    userId: ID!
+    username: String!
+    avatar: String!
+    mediaType: String         # Optional: "image" | "video"
+    mediaUrl: String          # Optional URL to the uploaded media
+    caption: String           # Optional text or main content
+    createdAt: String!
+    expiresAt: String!
+     isArchived: Boolean
+    location: String
+    viewers: [String]
+    replies: [StoryReply]
+  }
+
   type Query {
     admin(id: ID!): Admin
+    getAllUsersByAdmin: [User]
     allUsers : Int
     totalPosts: Int
     BlockCount: Int
+        getStoriesbyUser(userId: ID!): [Story]
+        getMyStories(userId: ID!): [Story]
      getUserLikedPosts(userId: ID!): [Post!]!
      getUserCommentedPosts(userId: ID!): [Post!]!
      getUserLikedVideos(userId: ID!): [Post!]!
@@ -119,7 +138,7 @@ const adminTypeDefs = gql`
     loginAdmin(input: LoginAdminInput!): AuthPayload!
     blockUser(userId: ID!): User
     unblockUser(userId: ID!): User
-     DeletePostByAdmin(id: ID!) : String!
+     DeletePostByAdmin(id: ID!,type: String!) : String!
      createCategory(name: String!, userId: ID!): Category!
     deleteCategory(id: ID!, userId: ID!): Boolean!
   }

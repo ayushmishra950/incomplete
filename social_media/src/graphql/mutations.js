@@ -1,14 +1,87 @@
 
 import { gql } from "@apollo/client";
 
+export const GET_LIKED_IMAGE_POSTS_BY_USER = gql`
+  query GetLikedImagePostsByUser($userId: ID!) {
+    getLikedImagePostsByUser(userId: $userId) {
+      id
+      caption
+      imageUrl
+    }
+  }
+`;
+export const GET_COMMENTED_IMAGE_POSTS_BY_USER = gql`
+  query GetCommentedImagePostsByUser($userId: ID!) {
+    getCommentedImagePostsByUser(userId: $userId) {
+      id
+      caption
+      imageUrl
+      comments {
+        text
+      }
+    }
+  }
+`;
+
+export const GET_LIKED_VIDEO_POSTS_BY_USER = gql`
+  query GetLikedVideoPostsByUser($userId: ID!) {
+    getLikedVideoPostsByUser(userId: $userId) {
+      id
+      caption
+      videoUrl
+    }
+  }
+`;
+
+
+
+export const GET_COMMENTED_VIDEO_POSTS_BY_USER = gql`
+  query GetCommentedVideoPostsByUser($userId: ID!) {
+    getCommentedVideoPostsByUser(userId: $userId) {
+      id
+      caption
+      videoUrl
+      comments {
+        text
+      }
+    }
+  }
+`;
+
+export const GET_LIKED_REELS_BY_USER = gql`
+  query GetLikedReelsByUser($userId: ID!) {
+    getLikedReelsByUser(userId: $userId) {
+      id
+      title
+      videoUrl
+    }
+  }
+`;
+
+export const GET_COMMENTED_REELS_BY_USER = gql`
+  query GetCommentedReelsByUser($userId: ID!) {
+    getCommentedReelsByUser(userId: $userId) {
+      id
+      title
+      videoUrl
+      comments {
+        text
+      }
+    }
+  }
+`;
+
+
 export const GET_ALL_USERS_BY_ADMIN = gql`
-  query GetAllUsers {
-    getAllUsers {
+  query GetAllUsersByAdmin {
+    getAllUsersByAdmin {
       id
       name
       username
+profileImage
       email
       isOnline
+      is_blocked
       following {
         id
       }
@@ -60,6 +133,7 @@ export const GET_FOLLOWERS = gql`
     getFollowers(userId: $userId) {
       id
       username
+      profileImage
     }
   }
 `;
@@ -129,6 +203,31 @@ export const GET_ACHIVE_STORIES = gql`
       createdAt
       expiresAt
       isArchived
+    }
+  }
+`;
+export const GET_ACHIVE_STORIES_BY_USERS = gql`
+  query GetStoriesbyUser($userId: ID!) {
+    getStoriesbyUser(userId: $userId) {
+      id
+      mediaType
+      mediaUrl
+      caption
+      createdAt
+      expiresAt
+      isArchived
+    }
+  }
+`;
+
+export const GET_MY_STORIES = gql`
+  query GetMyStories($userId: ID!) {
+    getMyStories(userId: $userId) {
+      id
+      mediaType
+      mediaUrl
+      caption
+      createdAt
     }
   }
 `;
@@ -258,7 +357,6 @@ export const BLOCK_ADMIN_BY_USER = gql`
   }
 `;
 
-
 export const UNBLOCK_ADMIN_BY_USER = gql`
   mutation unblockUser($userId: ID!) {
     unblockUser(userId: $userId) {
@@ -378,7 +476,6 @@ export const CREATE_POST = gql`
     }
   }
 `;
-
 export const DELETE_POST_BY_ADMIN = gql`
   mutation DeletePostByAdmin($id: ID!, $type: String!) { 
   DeletePostByAdmin(id: $id,type:$type)
@@ -472,6 +569,67 @@ export const GET_ALL_POSTS_SAFE = gql`
         id
         text
         commentedAt
+      }
+    }
+  }
+`;
+
+// New query for profile page - only user's own posts
+export const GET_USER_OWN_POSTS = gql`
+  query getUserOwnPosts($userId: ID!) {
+    getUserOwnPosts(userId: $userId) {
+      id
+      caption
+      imageUrl
+      videoUrl
+      thumbnailUrl
+      isVideo
+      createdBy {
+        id
+        name
+        username
+        profileImage
+      }
+      createdAt
+      likes {
+        user {
+          id
+        }
+        likedAt
+      }
+      comments {
+        id
+        text
+        user {
+          id
+          name
+          username
+          profileImage
+        }
+        commentedAt
+        likes {
+          user {
+            id
+          }
+          likedAt
+        }
+        replies {
+          id
+          text
+          user {
+            id
+            name
+            username
+            profileImage
+          }
+          repliedAt
+          likes {
+            user {
+              id
+            }
+            likedAt
+          }
+        }
       }
     }
   }

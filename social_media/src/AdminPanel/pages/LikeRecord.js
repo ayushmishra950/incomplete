@@ -1,5 +1,5 @@
 "use client"
-import { Play, Video, FileText, MessageCircle, ChevronRight } from "lucide-react"
+import { Play, Video, FileText, MessageCircle, ChevronRight, X } from "lucide-react"
 import { useState, useEffect } from "react"
 import Skeleton from "./Skeleton"
 import AlllikedReels from "./AlllikedReels"
@@ -13,12 +13,14 @@ const LikeRecord = ({ onBack, selectedUser }) => {
   const [imageLoadingStates, setImageLoadingStates] = useState({})
   const [profileImageLoading, setProfileImageLoading] = useState(true)
   const [activeTab, setActiveTab] = useState("All")
+  const [previewItem, setPreviewItem] = useState(null)
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false)
 
   // Fetch real liked data
+  console.log(selectedUser?.id)
   const { data: reelData } = useQuery(GET_USER_LIKED_REELS, { variables: { userId: selectedUser?.id } })
   const { data: videoData } = useQuery(GET_USER_LIKED_VIDEOS, { variables: { userId: selectedUser?.id } })
   const { data: postData } = useQuery(GET_USER_LIKED_POSTS, { variables: { userId: selectedUser?.id } })
-
   useEffect(() => {
     const ids = [1, 2, 3, 4]
     const initialStates = {}
@@ -139,6 +141,56 @@ const LikeRecord = ({ onBack, selectedUser }) => {
     return `M ${centerX} ${centerY} L ${x1} ${y1} A ${radius} ${radius} 0 ${largeArcFlag} 1 ${x2} ${y2} Z`
   }
 
+  const handlePreview = (item) => {
+    setPreviewItem(item);
+    setIsPreviewOpen(true);
+  };
+
+  const closePreview = () => {
+    setIsPreviewOpen(false);
+    setPreviewItem(null);
+  };
+
+  const renderPreviewModal = () => {
+    if (!isPreviewOpen || !previewItem) return null;
+
+    return (
+      <div 
+        className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50"
+        onClick={closePreview}
+        style={{ cursor: 'pointer' }}
+      >
+        {previewItem.videoUrl ? (
+          <video
+            src={previewItem.videoUrl}
+            className="max-w-full max-h-full"
+            controls
+            autoPlay
+            playsInline
+            style={{ maxHeight: '90vh' }}
+            onClick={(e) => e.stopPropagation()}
+          />
+        ) : previewItem.imageUrl ? (
+          <img
+            src={previewItem.imageUrl}
+            alt="Preview"
+            className="max-w-full max-h-full"
+            style={{ maxHeight: '90vh', objectFit: 'contain' }}
+            onClick={(e) => e.stopPropagation()}
+          />
+        ) : null}
+        
+        <button 
+          onClick={closePreview}
+          className="absolute top-4 right-4 text-white hover:bg-white hover:bg-opacity-20 rounded-full p-1"
+          style={{ zIndex: 10 }}
+        >
+          <X className="w-8 h-8" />
+        </button>
+      </div>
+    );
+  };
+
   const renderLikedItems = () => {
     return likedItems.map((item) => {
       const IconComponent = item.icon
@@ -186,7 +238,10 @@ const LikeRecord = ({ onBack, selectedUser }) => {
             <h3 className="font-semibold text-gray-900 mb-1">{item.type}</h3>
             <p className="text-sm text-gray-600">Liked on {item.date}</p>
           </div>
-          <button className="flex items-center gap-1 text-gray-600 hover:text-[#B65FCF] transition-colors">
+          <button 
+            onClick={() => handlePreview(item)}
+            className="flex items-center gap-1 text-gray-600 hover:text-[#B65FCF] transition-colors"
+          >
             <span className="font-medium">View</span>
             <ChevronRight className="w-4 h-4" />
           </button>
@@ -196,7 +251,8 @@ const LikeRecord = ({ onBack, selectedUser }) => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 relative">
+      {renderPreviewModal()}
       {/* Header */}
       <div className="bg-white shadow-sm border-b border-gray-200 p-6">
         <div className="max-w-6xl mx-auto">

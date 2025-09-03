@@ -245,7 +245,7 @@ let finalLikedItems = totalLikedItemsLength > 0 ? likedItems : 0;
         {activeTab === "Like Record" ? (
           <LikeRecord onBack={handleBackFromLikeRecord}  selectedUser={selectedUser} />
         ) : activeTab === "Story Record" ? (
-          <StoryRecord />
+          <StoryRecord selectedUser={selectedUser} />
         ) : activeTab === "Comment Record" ? (
           <CommentRecord selectedUser={selectedUser} />
         ) : activeTab === "Activity Record" ? (

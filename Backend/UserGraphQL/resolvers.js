@@ -29,13 +29,61 @@ const resolvers = {
 
     getAllUsers: async () => {
       try {
-        const users = await User.find({}).populate('posts').populate('followers').populate('following');
+        const users = await User.find({}).populate('posts').populate('followers').populate('following').populate("is_blocked");
         return users;
       } catch (error) {
         console.error("Error fetching users:", error);
         throw new Error("Failed to fetch users");
       }
     },
+
+    getLikedImagePostsByUser: async (_, { userId }) => {
+      const posts = await Post.find({
+        "likes.user": userId,
+        imageUrl: { $ne: null }
+      }).populate("likes", "_id username");
+      return posts;
+    },
+    
+    getCommentedImagePostsByUser: async (_, { userId }) => {
+      const posts = await Post.find({
+        "comments.user": userId,
+        imageUrl: { $ne: null }
+      }).populate("createdBy", "username profilePic");
+      return posts;
+    },
+    
+    getLikedVideoPostsByUser: async (_, { userId }) => {
+      const videos = await Post.find({
+        "likes.user": userId,
+        videoUrl: { $ne: null }
+      }).populate("createdBy", "username");
+      return videos;
+    },
+    
+    getLikedReelsByUser: async (_, { userId }) => {
+      const reels = await Video.find({
+        "likes.user": userId,
+        videoUrl: { $ne: null }
+      }).populate("createdBy", "username");
+      return reels;
+    },
+    
+    getCommentedVideoPostsByUser: async (_, { userId }) => {
+      const videos = await Post.find({
+        "comments.user": userId,
+        videoUrl: { $ne: null }
+      });
+      return videos;
+    },
+    
+    getCommentedReelsByUser: async (_, { userId }) => {
+      const reels = await Video.find({
+        "comments.user": userId,
+        videoUrl: { $ne: null }
+      });
+      return reels;
+    },    
 getFollowRequestsByUser: async (_, { userId }) => {
       try {
         // Find all follow requests where the user is either requester or recipient
@@ -213,6 +261,33 @@ mySelf: async (_, { userId }, { dataSources }) => {
   } catch (error) {
     console.error('getAllPosts error:', error);
     throw new Error('Failed to fetch posts');
+  }
+},
+
+// New resolver for profile page - only user's own posts
+getUserOwnPosts: async (_, { userId }) => {
+  try {
+    // Fetch only posts created by the specific user
+    const posts = await Post.find({ createdBy: userId, isArchived: { $ne: true } })
+      .sort({ createdAt: -1 })
+      .populate("createdBy", "id name username profileImage")
+      .populate("likes.user", "id name username profileImage")
+      .populate("comments.user", "id name username profileImage")
+      .populate("comments.likes.user", "id name username profileImage")
+      .populate("comments.replies.user", "id name username profileImage")
+      .populate("comments.replies.likes.user", "id name username profileImage");
+
+    // ✅ Add isVideo flag to posts based on whether they have videoUrl
+    const postsWithFlag = posts.map(post => ({
+      ...post._doc,
+      id: post._id,
+      isVideo: !!post.videoUrl // true if post has video, false otherwise
+    }));
+
+    return postsWithFlag;
+  } catch (error) {
+    console.error('getUserOwnPosts error:', error);
+    throw new Error('Failed to fetch user posts');
   }
 },
 

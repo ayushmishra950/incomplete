@@ -10,7 +10,7 @@ import { GetTokenFromCookie } from '../../components/getToken/GetToken';
 
 
 
-export default function Dashboard() {
+export default function Dashboard({ setCurrentPage }) {
   const [isAnimated, setIsAnimated] = useState(false);
     const [allUsers, setAllUsers] = useState(0);
     const [allBlockUsers, setAllBlockUsers] = useState(0);
@@ -170,96 +170,91 @@ const { data: blockData, loading: blockLoading, error: blockError } = useQuery(G
 
 
   const stats = [
-    { title: "Total Users", value:1000, startValue: 4200, displayValue: "4,562", change: null },
-    { title: "Active Users", value: 1450, startValue: 1350, displayValue: "1,450", change: "12% Today" },
-    { title: "Blocked Users", value: 23, startValue: 21, displayValue: "23", change: null },
-    { title: "Total Posts", value: 8560, startValue: 7900, displayValue: "8,560", change: null },
+    { 
+      title: "Total Users", 
+      value: allUsers || 0, 
+      startValue: 4200, 
+      displayValue: allUsers?.toLocaleString() || "0", 
+      change: null,
+      onClick: () => setCurrentPage("User Data")
+    },
+    { 
+      title: "Active Users", 
+      value: allActiveUsers || 0, 
+      startValue: 0, 
+      displayValue: allActiveUsers?.toLocaleString() || "0",
+      change: "12% Today",
+      onClick: () => setCurrentPage("Active Users")
+    },
+    { 
+      title: "Blocked Users", 
+      value: allBlockUsers || 0, 
+      startValue: 0, 
+      displayValue: allBlockUsers?.toLocaleString() || "0",
+      change: null,
+      onClick: () => setCurrentPage("Blocked Users")
+    },
+    { 
+      title: "Total Posts", 
+      value: allPosts || 0, 
+      startValue: 7900, 
+      displayValue: allPosts?.toLocaleString() || "0",
+      change: null 
+    },
   ]
 
   const renderStatsCards = () => {
     return (
       <>
-        {/* Total Users */}
-        <div className="bg-white rounded-lg p-3 sm:p-6 shadow-sm border border-gray-200 min-w-0">
-          <h3 className="text-xs sm:text-sm font-medium text-gray-500 mb-1 sm:mb-2 truncate">Total Users</h3>
-          <div className="flex items-end justify-between min-w-0">
-            <span className="text-lg sm:text-3xl font-bold text-gray-900 truncate">
-              <CountUp
-                start={4200}
-                end={allUsers || 0}
-                duration={2}
-                separator=","
-                useEasing={true}
-                easingFn={(t, b, c, d) => {
-                  return c * ((t = t / d - 1) * t * t + 1) + b
-                }}
-              />
-            </span>
-          </div>
-        </div>
-
-        {/* Active Users */}
-        <div className="bg-white rounded-lg p-3 sm:p-6 shadow-sm border border-gray-200 min-w-0">
-          <h3 className="text-xs sm:text-sm font-medium text-gray-500 mb-1 sm:mb-2 truncate">Active Users</h3>
-          <div className="flex items-end justify-between min-w-0">
-            <span className="text-lg sm:text-3xl font-bold text-gray-900 truncate">
-              <CountUp
-                start={0}
-                end={allActiveUsers || 0}
-                duration={1}
-                separator=","
-                useEasing={true}
-                easingFn={(t, b, c, d) => {
-                  return c * ((t = t / d - 1) * t * t + 1) + b
-                }}
-              />
-            </span>
-          </div>
-          <div className="flex items-center mt-1 sm:mt-2 min-w-0">
-            <div className={`w-2 h-2 rounded-full mr-1 flex-shrink-0 ${allActiveUsers > 0 ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></div>
-            <span className={`text-xs sm:text-sm truncate ${allActiveUsers > 0 ? 'text-green-500' : 'text-gray-400'}`}>
-              {allActiveUsers > 0 ? 'Real-time Online' : 'No users online'}
-            </span>
-          </div>
-        </div>
-
-        {/* Blocked Users */}
-        <div className="bg-white rounded-lg p-3 sm:p-6 shadow-sm border border-gray-200 min-w-0">
-          <h3 className="text-xs sm:text-sm font-medium text-gray-500 mb-1 sm:mb-2 truncate">Blocked Users</h3>
-          <div className="flex items-end justify-between min-w-0">
-            <span className="text-lg sm:text-3xl font-bold text-gray-900 truncate">
-              <CountUp
-                start={21}
-                end={allBlockUsers || 0}
-                duration={2}
-                separator=","
-                useEasing={true}
-                easingFn={(t, b, c, d) => {
-                  return c * ((t = t / d - 1) * t * t + 1) + b
-                }}
-              />
-            </span>
-          </div>
-        </div>
-
-        {/* Total Posts */}
-        <div className="bg-white rounded-lg p-3 sm:p-6 shadow-sm border border-gray-200 min-w-0">
-          <h3 className="text-xs sm:text-sm font-medium text-gray-500 mb-1 sm:mb-2 truncate">Total Posts</h3>
-          <div className="flex items-end justify-between min-w-0">
-            <span className="text-lg sm:text-3xl font-bold text-gray-900 truncate">
-              <CountUp
-                start={7900}
-                end={allPosts || 8560}
-                duration={2}
-                separator=","
-                useEasing={true}
-                easingFn={(t, b, c, d) => {
-                  return c * ((t = t / d - 1) * t * t + 1) + b
-                }}
-              />
-            </span>
-          </div>
-        </div>
+        {stats.map((stat, index) => {
+          const isActiveUsers = stat.title === 'Active Users';
+          return (
+            <div 
+              key={stat.title}
+              className={`bg-white rounded-lg p-3 sm:p-6 shadow-sm border border-gray-200 min-w-0 transition-colors ${
+                stat.onClick ? 'hover:bg-gray-50 cursor-pointer' : ''
+              }`}
+              onClick={stat.onClick}
+            >
+              <div className="flex justify-between items-center">
+                <h3 className="text-xs sm:text-sm font-medium text-gray-500 mb-1 sm:mb-2 truncate">{stat.title}</h3>
+                {stat.onClick && (
+                  <button 
+                    className="px-2 py-1 text-xs bg-blue-100 text-blue-600 rounded hover:bg-blue-200 transition-colors"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      stat.onClick();
+                    }}
+                  >
+                    View
+                  </button>
+                )}
+              </div>
+              <div className="flex items-end justify-between min-w-0">
+                <span className="text-lg sm:text-3xl font-bold text-gray-900 truncate">
+                  <CountUp
+                    start={stat.startValue}
+                    end={stat.value}
+                    duration={2}
+                    separator=","
+                    useEasing={true}
+                    easingFn={(t, b, c, d) => {
+                      return c * ((t = t / d - 1) * t * t + 1) + b;
+                    }}
+                  />
+                </span>
+              </div>
+              {isActiveUsers && (
+                <div className="flex items-center mt-1 sm:mt-2 min-w-0">
+                  <div className={`w-2 h-2 rounded-full mr-1 flex-shrink-0 ${stat.value > 0 ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></div>
+                  <span className={`text-xs sm:text-sm truncate ${stat.value > 0 ? 'text-green-500' : 'text-gray-400'}`}>
+                    {stat.value > 0 ? 'Real-time Online' : 'No users online'}
+                  </span>
+                </div>
+              )}
+            </div>
+          );
+        })}
       </>
     )
   }

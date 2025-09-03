@@ -1,9 +1,10 @@
-import React, {useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import PageShell from "./PageShell";
-import { useQuery } from "@apollo/client"
-import { GET_USER_LIKED_REELS, GET_USER_LIKED_VIDEOS, GET_USER_LIKED_POSTS } from "../../graphql/mutations"
-import { GET_USER_COMMENTED_REELS, GET_USER_COMMENTED_VIDEOS, GET_USER_COMMENTED_POSTS } from "../../graphql/mutations"
+import { useQuery } from "@apollo/client";
+import { GET_LIKED_IMAGE_POSTS_BY_USER, GET_LIKED_VIDEO_POSTS_BY_USER, GET_LIKED_REELS_BY_USER } from "../../graphql/mutations";
+import { GET_COMMENTED_IMAGE_POSTS_BY_USER, GET_COMMENTED_VIDEO_POSTS_BY_USER, GET_COMMENTED_REELS_BY_USER } from "../../graphql/mutations";
 import { GetTokenFromCookie } from '../getToken/GetToken';
+import { FaHeart, FaComment, FaBookmark } from 'react-icons/fa';
 
 export default function YourActivity() {
   const [category, setCategory] = useState("likes");
@@ -14,21 +15,55 @@ export default function YourActivity() {
 
       useEffect(() => {
             const decodedUser = GetTokenFromCookie();
-            /* console.log(...) */ void 0;
             if(decodedUser?.id){
             setToken(decodedUser);
             }
           }, []);
       
-  
 
-    const { data: reelLikeData } = useQuery(GET_USER_LIKED_REELS, { variables: { userId: token?.id } })
-    const { data: videoLikeData } = useQuery(GET_USER_LIKED_VIDEOS, { variables: { userId: token?.id } })
-    const { data: postLikeData } = useQuery(GET_USER_LIKED_POSTS, { variables: { userId: token?.id } })
-const { data: reelCommentData } = useQuery(GET_USER_COMMENTED_REELS, { variables: { userId: token?.id } })
-  const { data: videoCommentData } = useQuery(GET_USER_COMMENTED_VIDEOS, { variables: { userId: token?.id } })
-  const { data: postCommentData } = useQuery(GET_USER_COMMENTED_POSTS, { variables: { userId: token?.id } })
-  // Tab switch par menu band ho jaye
+
+          const { data: reelLikeData } = useQuery(GET_LIKED_REELS_BY_USER, { variables: { userId: token?.id } })
+          const { data: videoLikeData } = useQuery(GET_LIKED_VIDEO_POSTS_BY_USER, { variables: { userId: token?.id } })
+          const { data: postLikeData } = useQuery(GET_LIKED_IMAGE_POSTS_BY_USER, { variables: { userId: token?.id } })
+  // Fetch commented data
+  const { data: postCommentData } = useQuery(GET_COMMENTED_IMAGE_POSTS_BY_USER, {
+    variables: { userId: token?.id },
+    skip: category !== 'comments' || subCategory !== 'post'
+  });
+
+  const { data: videoCommentData } = useQuery(GET_COMMENTED_VIDEO_POSTS_BY_USER, {
+    variables: { userId: token?.id },
+    skip: category !== 'comments' || subCategory !== 'video'
+  });
+
+  const { data: reelCommentData } = useQuery(GET_COMMENTED_REELS_BY_USER, {
+    variables: { userId: token?.id },
+    skip: category !== 'comments' || subCategory !== 'reel'
+  });
+
+  // Helper function to get comment count
+  const getCommentCount = (comments) => {
+    if (!comments) return 0;
+    if (Array.isArray(comments)) return comments.length;
+    if (typeof comments === 'object' && comments !== null) {
+      // Handle case where comments is an object with a text property
+      return comments.text ? 1 : 0;
+    }
+    return 0;
+  };
+
+  // Helper function to get comment text
+  const getCommentText = (comments) => {
+    if (!comments) return '';
+    if (Array.isArray(comments) && comments.length > 0) {
+      return comments[0].text || '';
+    }
+    if (typeof comments === 'object' && comments !== null && comments.text) {
+      return comments.text;
+    }
+    return '';
+  };
+
   const handleTab = (tab) => {
     setCategory(tab);
     setSubCategory("reel"); // Reset to reel when switching tabs
@@ -177,78 +212,304 @@ const { data: reelCommentData } = useQuery(GET_USER_COMMENTED_REELS, { variables
           </button>
         </div>
       )}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 20 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '24px', width: '100%', padding: '0 20px' }}>
         {/* Likes Section Data */}
         {category === "likes" && (
           <>
-            {subCategory === "reel" && reelLikeData?.getUserLikedReels && (
-              reelLikeData.getUserLikedReels.map(reel => (
-                <div key={reel.id} style={{ width: 150, textAlign: 'center', border: '1px solid #e0e0e0', borderRadius: 8, padding: 8 }}>
-                  {reel.videoUrl ? (
-                    <video 
-                      src={reel.videoUrl} 
-                      alt="Liked Reel" 
-                      style={{ width: '100%', height: 120, objectFit: 'cover', borderRadius: 6 }} 
-                      controls={false}
-                      muted
-                    />
-                  ) : (
-                    <img 
-                      src="https://via.placeholder.com/150" 
-                      alt="No media" 
-                      style={{ width: '100%', height: 120, objectFit: 'cover', borderRadius: 6 }} 
-                    />
-                  )}
-                  <div style={{ fontSize: 12, marginTop: 8, color: '#666', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {reel.title || reel.caption || "Reel"}
+            {subCategory === "reel" && reelLikeData?.getLikedReelsByUser && (
+              reelLikeData.getLikedReelsByUser.map(reel => (
+                <div 
+                  key={reel.id} 
+                  style={{ 
+                    borderRadius: '12px', 
+                    overflow: 'hidden',
+                    boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
+                    backgroundColor: 'white',
+                    transition: 'transform 0.2s ease',
+                    cursor: 'pointer',
+                    '&:hover': {
+                      transform: 'scale(1.01)'
+                    }
+                  }}
+                >
+                  {/* Reel Thumbnail */}
+                  <div style={{ position: 'relative', width: '100%', paddingTop: '133.33%' }}>
+                    {reel.videoUrl || reel.thumbnailUrl ? (
+                      <>
+                        <img 
+                          src={reel.thumbnailUrl || reel.videoUrl} 
+                          alt={reel.title || "Liked Reel"} 
+                          style={{
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover'
+                          }} 
+                        />
+                        <div style={{
+                          position: 'absolute',
+                          top: '50%',
+                          left: '50%',
+                          transform: 'translate(-50%, -50%)',
+                          width: '36px',
+                          height: '36px',
+                          borderRadius: '50%',
+                          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: 'white',
+                          fontSize: '18px'
+                        }}>
+                          ▶
+                        </div>
+                      </>
+                    ) : (
+                      <div style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        height: '100%',
+                        backgroundColor: '#f5f5f5',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: '#999',
+                        fontSize: '14px'
+                      }}>
+                        No media available
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Reel Info */}
+                  <div style={{ 
+                    padding: '12px', 
+                    borderTop: '1px solid #f0f0f0',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between'
+                  }}>
+                    <div>
+                      <div style={{ 
+                        fontWeight: '600', 
+                        marginBottom: '4px',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis'
+                      }}>
+                        {reel.title || reel.caption || 'Liked Reel'}
+                      </div>
+                      <div style={{ 
+                        fontSize: '14px', 
+                        color: '#666',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px'
+                      }}>
+                        <span><FaHeart style={{ marginRight: '4px' }} /> {reel.likes || 0}</span>
+                        <span><FaComment style={{ marginRight: '4px' }} /> {getCommentCount(reel.comments)}</span>
+                      </div>
+                    </div>
+                    <div style={{ color: '#666' }}>
+                      <FaBookmark />
+                    </div>
                   </div>
                 </div>
               ))
             )}
             
-            {subCategory === "post" && postLikeData?.getUserLikedPosts && (
-              postLikeData.getUserLikedPosts.map(post => (
-                <div key={post.id} style={{ width: 150, textAlign: 'center', border: '1px solid #e0e0e0', borderRadius: 8, padding: 8 }}>
-                  {post.imageUrl ? (
-                    <img 
-                      src={post.imageUrl} 
-                      alt="Liked Post" 
-                      style={{ width: '100%', height: 120, objectFit: 'cover', borderRadius: 6 }} 
-                    />
-                  ) : (
-                    <img 
-                      src="https://via.placeholder.com/150" 
-                      alt="No media" 
-                      style={{ width: '100%', height: 120, objectFit: 'cover', borderRadius: 6 }} 
-                    />
-                  )}
-                  <div style={{ fontSize: 12, marginTop: 8, color: '#666', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {post.title || post.caption || "Post"}
+            {subCategory === "post" && postLikeData?.getLikedImagePostsByUser && (
+              postLikeData.getLikedImagePostsByUser.map(post => (
+                <div 
+                  key={post.id} 
+                  style={{ 
+                    borderRadius: '12px', 
+                    overflow: 'hidden',
+                    boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
+                    backgroundColor: 'white',
+                    transition: 'transform 0.2s ease',
+                    cursor: 'pointer',
+                    '&:hover': {
+                      transform: 'scale(1.01)'
+                    }
+                  }}
+                >
+                  {/* Post Image */}
+                  <div style={{ position: 'relative', width: '100%', paddingTop: '100%' }}>
+                    {post.imageUrl ? (
+                      <img 
+                        src={post.imageUrl} 
+                        alt={post.caption || "Liked Post"} 
+                        style={{
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'cover'
+                        }} 
+                      />
+                    ) : (
+                      <div style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        height: '100%',
+                        backgroundColor: '#f5f5f5',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: '#999',
+                        fontSize: '14px'
+                      }}>
+                        No image available
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Post Info */}
+                  <div style={{ 
+                    padding: '12px', 
+                    borderTop: '1px solid #f0f0f0',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between'
+                  }}>
+                    <div>
+                      <div style={{ 
+                        fontWeight: '600', 
+                        marginBottom: '4px',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis'
+                      }}>
+                        {post.caption || 'Liked Post'}
+                      </div>
+                      <div style={{ 
+                        fontSize: '14px', 
+                        color: '#666',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px'
+                      }}>
+                        <span><FaHeart style={{ marginRight: '4px' }} /> {post.likes || 0}</span>
+                        <span><FaComment style={{ marginRight: '4px' }} /> {getCommentCount(post.comments)}</span>
+                      </div>
+                    </div>
+                    <div style={{ color: '#666' }}>
+                      <FaBookmark />
+                    </div>
                   </div>
                 </div>
               ))
             )}
             
-            {subCategory === "video" && videoLikeData?.getUserLikedVideos && (
-              videoLikeData.getUserLikedVideos.map(video => (
-                <div key={video.id} style={{ width: 150, textAlign: 'center', border: '1px solid #e0e0e0', borderRadius: 8, padding: 8 }}>
-                  {video.videoUrl ? (
-                    <video 
-                      src={video.videoUrl} 
-                      alt="Liked Video" 
-                      style={{ width: '100%', height: 120, objectFit: 'cover', borderRadius: 6 }} 
-                      controls={false}
-                      muted
-                    />
-                  ) : (
-                    <img 
-                      src="https://via.placeholder.com/150" 
-                      alt="No media" 
-                      style={{ width: '100%', height: 120, objectFit: 'cover', borderRadius: 6 }} 
-                    />
-                  )}
-                  <div style={{ fontSize: 12, marginTop: 8, color: '#666', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {video.title || video.caption || "Video"}
+            {subCategory === "video" && videoLikeData?.getLikedVideoPostsByUser && (
+              videoLikeData.getLikedVideoPostsByUser.map(video => (
+                <div 
+                  key={video.id} 
+                  style={{ 
+                    borderRadius: '12px', 
+                    overflow: 'hidden',
+                    boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
+                    backgroundColor: 'white',
+                    transition: 'transform 0.2s ease',
+                    cursor: 'pointer',
+                    '&:hover': {
+                      transform: 'scale(1.01)'
+                    }
+                  }}
+                >
+                  {/* Video Thumbnail */}
+                  <div style={{ position: 'relative', width: '100%', paddingTop: '133.33%' }}>
+                    {video.videoUrl || video.thumbnailUrl ? (
+                      <>
+                        <img 
+                          src={video.thumbnailUrl || video.videoUrl} 
+                          alt={video.title || "Liked Video"} 
+                          style={{
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover'
+                          }} 
+                        />
+                        <div style={{
+                          position: 'absolute',
+                          top: '50%',
+                          left: '50%',
+                          transform: 'translate(-50%, -50%)',
+                          width: '36px',
+                          height: '36px',
+                          borderRadius: '50%',
+                          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: 'white',
+                          fontSize: '18px'
+                        }}>
+                          ▶
+                        </div>
+                      </>
+                    ) : (
+                      <div style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        height: '100%',
+                        backgroundColor: '#f5f5f5',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: '#999',
+                        fontSize: '14px'
+                      }}>
+                        No video available
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Video Info */}
+                  <div style={{ 
+                    padding: '12px', 
+                    borderTop: '1px solid #f0f0f0',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between'
+                  }}>
+                    <div>
+                      <div style={{ 
+                        fontWeight: '600', 
+                        marginBottom: '4px',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis'
+                      }}>
+                        {video.title || video.caption || 'Liked Video'}
+                      </div>
+                      <div style={{ 
+                        fontSize: '14px', 
+                        color: '#666',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px'
+                      }}>
+                        <span><FaHeart style={{ marginRight: '4px' }} /> {video.likes || 0}</span>
+                        <span><FaComment style={{ marginRight: '4px' }} /> {getCommentCount(video.comments)}</span>
+                      </div>
+                    </div>
+                    <div style={{ color: '#666' }}>
+                      <FaBookmark />
+                    </div>
                   </div>
                 </div>
               ))
@@ -259,74 +520,300 @@ const { data: reelCommentData } = useQuery(GET_USER_COMMENTED_REELS, { variables
         {/* Comments Section Data */}
         {category === "comments" && (
           <>
-            {subCategory === "reel" && reelCommentData?.getUserCommentedReels && (
-              reelCommentData.getUserCommentedReels.map(reel => (
-                <div key={reel.id} style={{ width: 150, textAlign: 'center', border: '1px solid #e0e0e0', borderRadius: 8, padding: 8 }}>
-                  {reel.videoUrl ? (
-                    <video 
-                      src={reel.videoUrl} 
-                      alt="Commented Reel" 
-                      style={{ width: '100%', height: 120, objectFit: 'cover', borderRadius: 6 }} 
-                      controls={false}
-                      muted
-                    />
-                  ) : (
-                    <img 
-                      src="https://via.placeholder.com/150" 
-                      alt="No media" 
-                      style={{ width: '100%', height: 120, objectFit: 'cover', borderRadius: 6 }} 
-                    />
-                  )}
-                  <div style={{ fontSize: 12, marginTop: 8, color: '#666', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {reel.title || reel.caption || "Reel"}
+            {subCategory === "reel" && reelCommentData?.getCommentedReelsByUser && (
+              reelCommentData.getCommentedReelsByUser.map(reel => (
+                <div 
+                  key={reel.id} 
+                  style={{ 
+                    borderRadius: '12px', 
+                    overflow: 'hidden',
+                    boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
+                    backgroundColor: 'white',
+                    transition: 'transform 0.2s ease',
+                    cursor: 'pointer',
+                    '&:hover': {
+                      transform: 'scale(1.01)'
+                    }
+                  }}
+                >
+                  {/* Reel Thumbnail */}
+                  <div style={{ position: 'relative', width: '100%', paddingTop: '133.33%' }}>
+                    {reel.videoUrl || reel.thumbnailUrl ? (
+                      <>
+                        <img 
+                          src={reel.thumbnailUrl || reel.videoUrl} 
+                          alt={reel.title || "Commented Reel"} 
+                          style={{
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover'
+                          }} 
+                        />
+                        <div style={{
+                          position: 'absolute',
+                          top: '50%',
+                          left: '50%',
+                          transform: 'translate(-50%, -50%)',
+                          width: '36px',
+                          height: '36px',
+                          borderRadius: '50%',
+                          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: 'white',
+                          fontSize: '18px'
+                        }}>
+                          ▶
+                        </div>
+                      </>
+                    ) : (
+                      <div style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        height: '100%',
+                        backgroundColor: '#f5f5f5',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: '#999',
+                        fontSize: '14px'
+                      }}>
+                        No media available
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Reel Info */}
+                  <div style={{ 
+                    padding: '12px', 
+                    borderTop: '1px solid #f0f0f0',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between'
+                  }}>
+                    <div>
+                      <div style={{ 
+                        fontWeight: '600', 
+                        marginBottom: '4px',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis'
+                      }}>
+                        {reel.title || reel.caption || getCommentText(reel.comments) || 'Commented Reel'}
+                      </div>
+                      <div style={{ 
+                        fontSize: '14px', 
+                        color: '#666',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px'
+                      }}>
+                        <span><FaHeart style={{ marginRight: '4px' }} /> {reel.likes || 0}</span>
+                        <span><FaComment style={{ marginRight: '4px' }} /> {getCommentCount(reel.comments)}</span>
+                      </div>
+                    </div>
+                    <div style={{ color: '#666' }}>
+                      <FaBookmark />
+                    </div>
                   </div>
                 </div>
               ))
             )}
             
-            {subCategory === "post" && postCommentData?.getUserCommentedPosts && (
-              postCommentData.getUserCommentedPosts.map(post => (
-                <div key={post.id} style={{ width: 150, textAlign: 'center', border: '1px solid #e0e0e0', borderRadius: 8, padding: 8 }}>
-                  {post.imageUrl ? (
-                    <img 
-                      src={post.imageUrl} 
-                      alt="Commented Post" 
-                      style={{ width: '100%', height: 120, objectFit: 'cover', borderRadius: 6 }} 
-                    />
-                  ) : (
-                    <img 
-                      src="https://via.placeholder.com/150" 
-                      alt="No media" 
-                      style={{ width: '100%', height: 120, objectFit: 'cover', borderRadius: 6 }} 
-                    />
-                  )}
-                  <div style={{ fontSize: 12, marginTop: 8, color: '#666', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {post.title || post.caption || "Post"}
+            {subCategory === "post" && postCommentData?.getCommentedImagePostsByUser && (
+              postCommentData.getCommentedImagePostsByUser.map(post => (
+                <div 
+                  key={post.id} 
+                  style={{ 
+                    borderRadius: '12px', 
+                    overflow: 'hidden',
+                    boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
+                    backgroundColor: 'white',
+                    transition: 'transform 0.2s ease',
+                    cursor: 'pointer',
+                    '&:hover': {
+                      transform: 'scale(1.01)'
+                    }
+                  }}
+                >
+                  {/* Post Image */}
+                  <div style={{ position: 'relative', width: '100%', paddingTop: '100%' }}>
+                    {post.imageUrl ? (
+                      <img 
+                        src={post.imageUrl} 
+                        alt={post.caption || "Commented Post"} 
+                        style={{
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'cover'
+                        }} 
+                      />
+                    ) : (
+                      <div style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        height: '100%',
+                        backgroundColor: '#f5f5f5',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: '#999',
+                        fontSize: '14px'
+                      }}>
+                        No image available
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Post Info */}
+                  <div style={{ 
+                    padding: '12px', 
+                    borderTop: '1px solid #f0f0f0',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between'
+                  }}>
+                    <div>
+                      <div style={{ 
+                        fontWeight: '600', 
+                        marginBottom: '4px',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis'
+                      }}>
+                        {post.caption || getCommentText(post.comments) || 'Commented Post'}
+                      </div>
+                      <div style={{ 
+                        fontSize: '14px', 
+                        color: '#666',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px'
+                      }}>
+                        <span><FaHeart style={{ marginRight: '4px' }} /> {post.likes || 0}</span>
+                        <span><FaComment style={{ marginRight: '4px' }} /> {getCommentCount(post.comments)}</span>
+                      </div>
+                    </div>
+                    <div style={{ color: '#666' }}>
+                      <FaBookmark />
+                    </div>
                   </div>
                 </div>
               ))
             )}
             
-            {subCategory === "video" && videoCommentData?.getUserCommentedVideos && (
-              videoCommentData.getUserCommentedVideos.map(video => (
-                <div key={video.id} style={{ width: 150, textAlign: 'center', border: '1px solid #e0e0e0', borderRadius: 8, padding: 8 }}>
-                  {video.videoUrl ? (
-                    <video 
-                      src={video.videoUrl} 
-                      alt="Commented Video" 
-                      style={{ width: '100%', height: 120, objectFit: 'cover', borderRadius: 6 }} 
-                      controls={false}
-                      muted
-                    />
-                  ) : (
-                    <img 
-                      src="https://via.placeholder.com/150" 
-                      alt="No media" 
-                      style={{ width: '100%', height: 120, objectFit: 'cover', borderRadius: 6 }} 
-                    />
-                  )}
-                  <div style={{ fontSize: 12, marginTop: 8, color: '#666', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {video.title || video.caption || "Video"}
+            {subCategory === "video" && videoCommentData?.getCommentedVideoPostsByUser && (
+              videoCommentData.getCommentedVideoPostsByUser.map(video => (
+                <div 
+                  key={video.id} 
+                  style={{ 
+                    borderRadius: '12px', 
+                    overflow: 'hidden',
+                    boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
+                    backgroundColor: 'white',
+                    transition: 'transform 0.2s ease',
+                    cursor: 'pointer',
+                    '&:hover': {
+                      transform: 'scale(1.01)'
+                    }
+                  }}
+                >
+                  {/* Video Thumbnail */}
+                  <div style={{ position: 'relative', width: '100%', paddingTop: '133.33%' }}>
+                    {video.videoUrl || video.thumbnailUrl ? (
+                      <>
+                        <img 
+                          src={video.thumbnailUrl || video.videoUrl} 
+                          alt={video.title || "Commented Video"} 
+                          style={{
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover'
+                          }} 
+                        />
+                        <div style={{
+                          position: 'absolute',
+                          top: '50%',
+                          left: '50%',
+                          transform: 'translate(-50%, -50%)',
+                          width: '36px',
+                          height: '36px',
+                          borderRadius: '50%',
+                          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: 'white',
+                          fontSize: '18px'
+                        }}>
+                          ▶
+                        </div>
+                      </>
+                    ) : (
+                      <div style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        height: '100%',
+                        backgroundColor: '#f5f5f5',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: '#999',
+                        fontSize: '14px'
+                      }}>
+                        No video available
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Video Info */}
+                  <div style={{ 
+                    padding: '12px', 
+                    borderTop: '1px solid #f0f0f0',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between'
+                  }}>
+                    <div>
+                      <div style={{ 
+                        fontWeight: '600', 
+                        marginBottom: '4px',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis'
+                      }}>
+                        {video.title || video.caption || getCommentText(video.comments) || 'Commented Video'}
+                      </div>
+                      <div style={{ 
+                        fontSize: '14px', 
+                        color: '#666',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px'
+                      }}>
+                        <span><FaHeart style={{ marginRight: '4px' }} /> {video.likes || 0}</span>
+                        <span><FaComment style={{ marginRight: '4px' }} /> {getCommentCount(video.comments)}</span>
+                      </div>
+                    </div>
+                    <div style={{ color: '#666' }}>
+                      <FaBookmark />
+                    </div>
                   </div>
                 </div>
               ))

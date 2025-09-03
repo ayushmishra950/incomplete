@@ -494,6 +494,7 @@ const GET_USER_INFO = gql`
 export default function UserInfo({setProfile, profile, isFollowed, setIsFollowed}) {
 
     const decodedUser = GetTokenFromCookie();
+    console.log('Decoded user from token:', profile);
 
     // Fetch user information including real counts
     const { data: userInfoData, loading: userInfoLoading, refetch: refetchUserInfo } = useQuery(GET_USER_INFO, {
@@ -525,6 +526,9 @@ export default function UserInfo({setProfile, profile, isFollowed, setIsFollowed
         console.error("Error fetching user info:", error);
       }
     });
+
+              console.log('Full user info data:', userInfoData);
+
 
 const [followCounts, setFollowCounts] = useState(profile.stats.followers);
 
@@ -609,7 +613,7 @@ const [followCounts, setFollowCounts] = useState(profile.stats.followers);
               {userInfoLoading ? (
                 <div className="w-6 h-6 border-2 border-purple-300 border-t-purple-600 rounded-full animate-spin"></div>
               ) : (
-                userInfoData?.getUserInformation?.followers?.length || profile.stats.followers || 0
+                userInfoData?.getUserInformation?.followers?.length || profile?.stats?.followers || 0
               )}
             </span>
             <span className="text-[11px] xs:text-sm sm:text-base md:text-lg text-gray-500">
@@ -633,7 +637,7 @@ const [followCounts, setFollowCounts] = useState(profile.stats.followers);
               {userInfoLoading ? (
                 <div className="w-6 h-6 border-2 border-purple-300 border-t-purple-600 rounded-full animate-spin"></div>
               ) : (
-                userInfoData?.getUserInformation?.posts?.length || profile.stats.posts || 0
+                userInfoData?.getUserInformation?.posts?.length || profile?.stats?.posts || 0
               )}
             </span>
             <span className="text-[11px] xs:text-sm sm:text-base md:text-lg text-gray-500">

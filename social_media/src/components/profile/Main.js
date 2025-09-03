@@ -6,7 +6,7 @@ import PhotoGrid from "./PhotoGrid";
 import ShortsGrid from "./ShortsGrid";
 import { MdVideoLibrary } from 'react-icons/md';
 import { gql, useQuery } from '@apollo/client';
-import { GET_ALL_POSTS,GET_ME, GET_USER_VIDEOS } from '../../graphql/mutations';
+import { GET_ALL_POSTS, GET_USER_OWN_POSTS, GET_ME, GET_USER_VIDEOS } from '../../graphql/mutations';
 import axios, { all } from "axios";
 import { GetTokenFromCookie } from '../getToken/GetToken';
 
@@ -99,7 +99,7 @@ export default function Main({ userId }) {
       stats: {
         followers: user?.followers?.length || 0,
         following: user?.following?.length || 0,
-        posts: user?.posts?.length || 0,
+        posts: 0, // Will be updated when posts are fetched
       },
     };
 
@@ -187,9 +187,9 @@ export default function Main({ userId }) {
     }
   }, [underline]);
 
-  // Fetch posts from backend
-  const { data, loading, error, refetch } = useQuery(GET_ALL_POSTS, {
-    variables: { userId:  tokens?.id },
+  // Fetch posts from backend - use getUserOwnPosts for profile page
+  const { data, loading, error, refetch } = useQuery(GET_USER_OWN_POSTS, {
+    variables: { userId: userId || tokens?.id },
     skip: !userId && !tokens?.id,
   });
   /* console.log(...) */ void 0;
@@ -201,15 +201,15 @@ export default function Main({ userId }) {
   });
  
    useEffect(() => {
-    if (data?.getAllPosts) {      
-      setAllPosts(data.getAllPosts); // initial set
+    if (data?.getUserOwnPosts) {      
+      setAllPosts(data.getUserOwnPosts); // initial set
       
       // Update posts count in profile
       setProfile(prev => ({
         ...prev,
         stats: {
           ...prev.stats,
-          posts: data.getAllPosts.length
+          posts: data.getUserOwnPosts.length
         }
       }));
     }

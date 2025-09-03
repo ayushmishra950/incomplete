@@ -100,7 +100,20 @@ export default function HideYourStory() {
               checked={selectedUsers.includes(user.id)}
               onChange={() => handleToggle(user.id)}
             />
-            <span>{user.username}</span>
+            <div className="flex items-center space-x-2">
+              {user.profileImage ? (
+                <img 
+                  src={user.profileImage} 
+                  alt={user.username} 
+                  className="w-8 h-8 rounded-full object-cover"
+                />
+              ) : (
+                <div className="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center">
+                  {user.username.charAt(0).toUpperCase()}
+                </div>
+              )}
+              <span>{user.username}</span>
+            </div>
           </label>
         ))}
       </div>

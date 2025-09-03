@@ -308,12 +308,45 @@ const User = require('../../Models/user');
 const Post = require('../../Models/Post');
 const Block = require('../model/block');
 const mongoose = require("mongoose");
+const Story = require('../../Models/Story');
 const Video = require('../../Models/Video');
 const Category = require("../model/Category");
 const checkRole = require('../../middleware/roleCheck'); // ✅ role check
 
 const adminResolvers = {
   Query: {
+
+    getAllUsersByAdmin:checkRole(['ADMIN']) (async (_,{}) => {
+      try {
+        const users = await User.find({})
+          .populate('posts')
+          .populate('followers')
+          .populate("is_blocked")
+          .populate('following');
+        return users;
+      } catch (error) {
+        console.error("Error fetching users:", error);
+        throw new Error("Failed to fetch users");
+      }
+    }),    
+    getStoriesbyUser:checkRole(['ADMIN'])(async (_, { userId }) => {
+          try {
+            return await Story.find({ userId, isArchived: true }).sort({ createdAt: -1 });
+          } catch (err) {
+            console.error("Error fetching stories:", err);
+            throw new Error("Failed to fetch stories");
+          }
+        }),
+    getMyStories: async (_, { userId }) => {
+      try {
+        // Get all stories for the user (both active and archived)
+        const stories = await Story.find({ userId }).sort({ createdAt: -1 });
+        return stories;
+      } catch (err) {
+        console.error("Error fetching user stories:", err);
+        throw new Error("Failed to fetch user stories");
+      }
+    },
     getAllCategories: checkRole(['ADMIN'])(async () => {
       const categories = await Category.find().sort({ createdAt: -1 });
       return categories;
@@ -448,30 +481,52 @@ const adminResolvers = {
       return user;
     }),
 
-    DeletePostByAdmin: checkRole(['ADMIN'])(async (_, { id }) => {
-      if (!id) throw new Error("Id field not found");
-
-      // Try to delete from Post collection first
-      const deletePost = await Post.findByIdAndDelete(id);
-      if (deletePost) {
-        const user = await User.findById(deletePost.createdBy);
-        if (user) {
-          user.posts = user.posts.filter(
-            postId => postId.toString() !== deletePost._id.toString()
-          );
-          await user.save();
+       DeletePostByAdmin: checkRole(['ADMIN'])(async (_, { id, type }) => {
+      if (!id || !type) {
+        throw new Error("Both id and type are required");
+      }
+    
+      // 📝 Handle deleting a post
+      if (type === "posts") {
+        const deletePost = await Post.findByIdAndDelete(id);
+        if (deletePost) {
+          const user = await User.findById(deletePost.createdBy);
+          if (user) {
+            user.posts = user.posts.filter(
+              postId => postId.toString() !== deletePost._id.toString()
+            );
+            await user.save();
+          }
+          return "Post deleted successfully.";
+        } else {
+          throw new Error("Post not found");
         }
-        return "DeletePost Successfully...";
       }
-
-      // If not found in Post, try Video collection
-      const deleteVideo = await Video.findByIdAndDelete(id);
-      if (deleteVideo) {
-        return "DeleteVideo Successfully...";
+    
+      // 🎥 Handle deleting a reel
+      if (type === "reels") {
+        const deleteReel = await Video.findByIdAndDelete(id);
+        if (deleteReel) {
+          return "Reel deleted successfully.";
+        } else {
+          throw new Error("Reel not found");
+        }
       }
-
-      throw new Error("Post/Video not found");
+    
+      // 📖 Handle deleting a story
+      if (type === "stories") {
+        const deleteStory = await Story.findByIdAndDelete(id);
+        if (deleteStory) {
+          return "Story deleted successfully.";
+        } else {
+          throw new Error("Story not found");
+        }
+      }
+    
+      // ❌ If type doesn't match any of the above
+      throw new Error("Invalid type. Must be 'posts', 'reels', or 'stories'.");
     }),
+    
 
     createCategory: checkRole(['ADMIN'])(async (_, { name, userId }) => {
       const existing = await Category.findOne({ name });

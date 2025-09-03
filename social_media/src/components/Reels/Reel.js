@@ -538,16 +538,9 @@ const Reel = () => {
     const video = allVideos[currentVideoIndex];
     if (!video) return;
     
-    /* console.log(...) */ void 0;
-    /* console.log(...) */ void 0;
-    /* console.log(...) */ void 0;
-    /* console.log(...) */ void 0;
     
     try {
       const result = await likeVideo({ variables: { videoId: video.id } });
-      /* console.log(...) */ void 0;
-      
-      // Refetch videos to update like count
       if (typeof refetchVideos === 'function') refetchVideos();
     } catch (err) {
       console.error('🎬 Like error:', err);
@@ -560,11 +553,6 @@ const Reel = () => {
     const video = allVideos[currentVideoIndex];
     if (!video || !commentInput.trim()) return;
     
-    /* console.log(...) */ void 0;
-    /* console.log(...) */ void 0;
-    /* console.log(...) */ void 0;
-    /* console.log(...) */ void 0;
-    /* console.log(...) */ void 0;
     
     try {
       const result = await commentOnVideo({ variables: { videoId: video.id, text: commentInput } });

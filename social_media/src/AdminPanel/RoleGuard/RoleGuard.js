@@ -22,7 +22,9 @@ const RoleGuard = ({ allowedRoles, children }) => {
   const role = data.mySelf.role;
 
   if (!allowedRoles.includes(role)) {
-    return <p>Access Denied ❌</p>;
+    return(<div class="flex items-center justify-center h-screen">
+    <p class="text-4xl text-orange-500 font-semibold">Page Not Found 🚫</p>
+  </div>);
   }
 
   return children;

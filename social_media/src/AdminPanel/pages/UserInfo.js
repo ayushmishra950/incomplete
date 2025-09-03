@@ -15,8 +15,8 @@ import {
   Trash2,
 } from "lucide-react"
 import CountUp from "react-countup"
-import {GET_ALL_POSTS, GET_USER_VIDEOS,DELETE_POST_BY_ADMIN}  from "../../graphql/mutations"
-import {  useQuery,useMutation  } from '@apollo/client';
+import { GET_ALL_POSTS, GET_USER_OWN_POSTS, GET_USER_VIDEOS, DELETE_POST_BY_ADMIN, GET_ACHIVE_STORIES_BY_USERS } from "../../graphql/mutations"
+import { useQuery, useMutation } from '@apollo/client';
 import ActivityRecord from "./ActivityRecord"
 
 // Local image assets
@@ -97,10 +97,11 @@ const StatCard = ({ title, value, start, icon: Icon }) => (
 
 // Reusable component for content grids
 const ContentGrid = ({ items, type }) => {
+  console.log(items, type)
   const [openMenuId, setOpenMenuId] = useState(null)
   const [menuPos, setMenuPos] = useState({ top: 0, left: 0 })
 
-   const [DeletePostByAdmin] = useMutation(DELETE_POST_BY_ADMIN);
+  const [DeletePostByAdmin] = useMutation(DELETE_POST_BY_ADMIN);
 
   // Close dropdown on outside click or Escape
   useEffect(() => {
@@ -135,24 +136,23 @@ const ContentGrid = ({ items, type }) => {
 
 
   const handleDelete = async (itemId) => {
-  try {
-   const result = await DeletePostByAdmin({
-      variables: { id: itemId, type : type}
-    });
+    try {
+      const result = await DeletePostByAdmin({
+        variables: { id: itemId, type: type }
+      });
 
-    alert(result?.data?.DeletePostByAdmin);
-    setOpenMenuId(null);
-  } catch (err) {
-    console.error("Error deleting post:", err);
-  }
-};
+      alert(result?.data?.DeletePostByAdmin);
+      setOpenMenuId(null);
+    } catch (err) {
+      console.error("Error deleting post:", err);
+    }
+  };
 
 
   return (
     <div
-      className={`grid gap-4 ${
-        isStory ? "grid-cols-2 md:grid-cols-3 lg:grid-cols-4" : "grid-cols-3"
-      }`}
+      className={`grid gap-4 ${isStory ? "grid-cols-2 md:grid-cols-3 lg:grid-cols-4" : "grid-cols-3"
+        }`}
     >
       {items.map((item) => (
         <div
@@ -176,8 +176,8 @@ const ContentGrid = ({ items, type }) => {
             {openMenuId === item.id && (
               <div className="fixed w-30 bg-white border border-gray-200 rounded-md shadow-lg z-50" style={{ top: menuPos.top, left: menuPos.left }}>
                 <button
-                  onClick={(e) => { 
-                    e.stopPropagation(); 
+                  onClick={(e) => {
+                    e.stopPropagation();
                     handleDelete(item.id);
                   }}
                   className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-md"
@@ -190,24 +190,43 @@ const ContentGrid = ({ items, type }) => {
               </div>
             )}
           </div>
-      { item.imageUrl ?   
-          <img
-            src={ item?.imageUrl}
-            alt={`${type} thumbnail`}
-            className={`w-full h-full object-cover ${
-              isReel ? "aspect-[9/16]" : isStory ? "aspect-[9/16]" : "aspect-[1/1]"
-            }`}
-          />
-          :
-        //  item.videoUrl?
-           <video
-            src={item?.videoUrl}
-            alt={`${type} thumbnail`}
-            className={`w-full h-full object-cover ${
-              isReel ? "aspect-[9/16]" : isStory ? "aspect-[9/16]" : "aspect-[1/1]"
-            }`}
-          />
-}
+
+
+
+          {item?.imageUrl ? (
+            <img
+              src={item.imageUrl}
+              alt={`${type} thumbnail`}
+              className={`w-full h-full object-cover ${isReel || isStory ? "aspect-[9/16]" : "aspect-[1/1]"
+                }`}
+            />
+          ) : item?.videoUrl ? (
+            <video
+              src={item.videoUrl}
+              alt={`${type} thumbnail`}
+              className={`w-full h-full object-cover ${isReel || isStory ? "aspect-[9/16]" : "aspect-[1/1]"
+                }`}
+              controls
+            />
+          ) : item?.mediaUrl ? (
+            /\.(mp4|webm|ogg)$/i.test(item.mediaUrl) ? (
+              <video
+                src={item.mediaUrl}
+                alt={`${type} thumbnail`}
+                className={`w-full h-full object-cover ${isReel || isStory ? "aspect-[9/16]" : "aspect-[1/1]"
+                  }`}
+                controls
+              />
+            ) : (
+              <img
+                src={item.mediaUrl}
+                alt={`${type} thumbnail`}
+                className={`w-full h-full object-cover ${isReel || isStory ? "aspect-[9/16]" : "aspect-[1/1]"
+                  }`}
+              />
+            )
+          ) : null}
+
         </div>
       ))}
     </div>
@@ -216,12 +235,12 @@ const ContentGrid = ({ items, type }) => {
 
 export default function UserProfileDashboard({ selectedUser, onBackToUsers }) {
   const [activeTab, setActiveTab] = useState("posts");
-  const { data: postData, loading: usersLoading, error: usersError } = useQuery(GET_ALL_POSTS,{variables : {userId:selectedUser?.id}});
-  const { data: videoData, loading: videoLoading, error: videoError } = useQuery(GET_USER_VIDEOS,{variables:{userId:selectedUser?.id}});
-  
-    
+  const { data: postData, loading: usersLoading, error: usersError } = useQuery(GET_USER_OWN_POSTS, { variables: { userId: selectedUser?.id } });
+  const { data: videoData, loading: videoLoading, error: videoError } = useQuery(GET_USER_VIDEOS, { variables: { userId: selectedUser?.id } });
+  const { data: storyData, loading: storyLoading, error: storyError } = useQuery(GET_ACHIVE_STORIES_BY_USERS, { variables: { userId: selectedUser?.id } });
+
   // Prepare real posts data - transform backend data to match expected structure
-  const realPosts = (postData?.getAllPosts || []).map(post => ({
+  const realPosts = (postData?.getUserOwnPosts || []).map(post => ({
     id: post.id,
     url: post.imageUrl || post.videoUrl, // Use imageUrl first, then videoUrl as fallback
     imageUrl: post.imageUrl, // Keep original imageUrl
@@ -229,6 +248,13 @@ export default function UserProfileDashboard({ selectedUser, onBackToUsers }) {
     likes: Array.isArray(post.likes) ? post.likes.length : (post.likesCount || 0)
   }));
 
+  const realStory = (storyData?.getStoriesbyUser || []).map(story => ({
+    id: story.id,
+    mediaUrl: story.mediaUrl,
+    mediaType: story.mediaType,
+    caption: story.caption,
+    createdAt: story.createdAt
+  }))
   // Prepare real reels data - transform backend video data to match expected structure
   const realReels = (videoData?.getUserVideos || []).map(video => ({
     id: video.id,
@@ -264,8 +290,8 @@ export default function UserProfileDashboard({ selectedUser, onBackToUsers }) {
                   </div>
                 )}
                 {selectedUser?.profileImage && (
-                  <div 
-                    className="w-full h-full bg-gradient-to-br from-purple-400 to-pink-400 flex items-center justify-center" 
+                  <div
+                    className="w-full h-full bg-gradient-to-br from-purple-400 to-pink-400 flex items-center justify-center"
                     style={{ display: 'none' }}
                   >
                     <span className="text-2xl sm:text-4xl font-bold text-white">
@@ -313,54 +339,50 @@ export default function UserProfileDashboard({ selectedUser, onBackToUsers }) {
             />
             <StatCard
               title="Posts"
-              value={selectedUser?.posts?.length}
+              value={realPosts?.length || 0}
               start={25000}
               icon={Star}
             />
           </div>
         </section>
-        
+
         {/* Tabs and Content */}
         <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
           <div className="bg-white rounded-lg shadow-sm border border-gray-200">
             <div className="flex border-b border-gray-200">
               <button
                 onClick={() => setActiveTab("posts")}
-                className={`py-3 px-6 text-sm font-medium transition-colors border-b-2 ${
-                  activeTab === "posts"
+                className={`py-3 px-6 text-sm font-medium transition-colors border-b-2 ${activeTab === "posts"
                     ? "text-gray-900 border-purple-500"
                     : "text-gray-500 border-transparent hover:text-gray-700"
-                }`}
+                  }`}
               >
                 Posts
               </button>
               <button
                 onClick={() => setActiveTab("reels")}
-                className={`py-3 px-6 text-sm font-medium transition-colors border-b-2 ${
-                  activeTab === "reels"
+                className={`py-3 px-6 text-sm font-medium transition-colors border-b-2 ${activeTab === "reels"
                     ? "text-gray-900 border-purple-500"
                     : "text-gray-500 border-transparent hover:text-gray-700"
-                }`}
+                  }`}
               >
                 Reels
               </button>
               <button
                 onClick={() => setActiveTab("stories")}
-                className={`py-3 px-6 text-sm font-medium transition-colors border-b-2 ${
-                  activeTab === "stories"
+                className={`py-3 px-6 text-sm font-medium transition-colors border-b-2 ${activeTab === "stories"
                     ? "text-gray-900 border-purple-500"
                     : "text-gray-500 border-transparent hover:text-gray-700"
-                }`}
+                  }`}
               >
                 Stories
               </button>
               <button
                 onClick={() => setActiveTab("activity")}
-                className={`py-3 px-6 text-sm font-medium transition-colors border-b-2 ${
-                  activeTab === "activity"
+                className={`py-3 px-6 text-sm font-medium transition-colors border-b-2 ${activeTab === "activity"
                     ? "text-gray-900 border-purple-500"
                     : "text-gray-500 border-transparent hover:text-gray-700"
-                }`}
+                  }`}
               >
                 Activity Record
               </button>
@@ -395,7 +417,18 @@ export default function UserProfileDashboard({ selectedUser, onBackToUsers }) {
                 )
               )}
               {activeTab === "stories" && (
-                <ContentGrid items={contentData.stories} type="stories" />
+                storyLoading ? (
+                  <div className="flex items-center justify-center py-10">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#B65FCF]"></div>
+                    <span className="ml-2 text-gray-500">Loading stories...</span>
+                  </div>
+                ) : storyError ? (
+                  <div className="text-center text-red-500 py-10">
+                    Error loading stories: {storyError.message}
+                  </div>
+                ) : (
+                  <ContentGrid items={realStory} type="stories" />
+                )
               )}
               {activeTab === "activity" && (
                 <ActivityRecord selectedUser={selectedUser} />

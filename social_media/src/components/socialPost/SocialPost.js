@@ -557,7 +557,7 @@ const SocialPost = ({
                 onClick={handleBookmark}
               >
                 <FaBookmark className={isBookmarked ? "text-purple-600" : "text-gray-600"} />
-                {isBookmarked ? 'Saved' : 'Bookmark'}
+                {isBookmarked ? 'UnSaved' : 'Bookmark'}
               </button>
               {isOwner && (
                 <>
